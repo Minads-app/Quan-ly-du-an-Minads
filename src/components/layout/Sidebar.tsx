@@ -58,22 +58,34 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
     return (
         <aside
-            className={`hidden lg:flex flex-col fixed left-0 top-0 h-screen bg-white border-r border-slate-200 z-30 transition-all duration-300 ${collapsed ? "w-[72px]" : "w-64"
+            className={`hidden lg:flex flex-col fixed left-0 top-0 h-screen oklch(82.8% 0.189 84.429) border-r border-slate-200 z-30 transition-all duration-300 ${collapsed ? "w-[72px]" : "w-64"
                 }`}
         >
             {/* Logo */}
-            <div className="h-16 flex items-center px-4 border-b border-slate-100">
+            <div className={`h-16 flex items-center px-4 border-b border-primary-100/10 ${collapsed ? "justify-center" : ""}`}>
                 <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="flex-shrink-0 w-9 h-9 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">E</span>
+                    <div className="flex-shrink-0 w-8 h-8 relative">
+                        {/* Try to load logo.png, fallback to icon */}
+                        <img
+                            src="/logo.png"
+                            alt="Logo"
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                            }}
+                        />
+                        <div className="hidden w-full h-full bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-primary-500/30">
+                            M
+                        </div>
                     </div>
                     {!collapsed && (
                         <div className="min-w-0">
                             <h1 className="text-base font-bold text-slate-900 truncate">
                                 Minads
                             </h1>
-                            <p className="text-[10px] text-slate-400 truncate">
-                                Quản lý dự án
+                            <p className="text-[10px] text-slate-400 truncate font-medium">
+                                Project Manager
                             </p>
                         </div>
                     )}
