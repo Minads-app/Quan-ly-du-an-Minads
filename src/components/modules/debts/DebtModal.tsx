@@ -186,10 +186,6 @@ export default function DebtModal({
                             >
                                 <option value="">-- Chọn đối tác --</option>
                                 {partners
-                                    .filter(p => {
-                                        if (type === "RECEIVABLE") return ["Client", "Both"].includes(p.type);
-                                        return ["Supplier", "Both"].includes(p.type);
-                                    })
                                     .map((p) => (
                                         <option key={p.id} value={p.id}>
                                             {p.name}

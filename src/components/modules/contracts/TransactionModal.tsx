@@ -312,10 +312,6 @@ export default function TransactionModal({
                         >
                             <option value="">-- Chọn đối tác --</option>
                             {partners
-                                .filter((p) => {
-                                    if (type === "RECEIPT") return ["Client", "Both"].includes(p.type);
-                                    return ["Supplier", "Both"].includes(p.type);
-                                })
                                 .map((p) => (
                                     <option key={p.id} value={p.id}>
                                         {p.name}
