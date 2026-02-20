@@ -9,6 +9,7 @@ import { getSettings } from "@/lib/actions/settings"; // Or just fetch via supab
 interface QuoteData {
     id: string;
     total_amount: number;
+    vat_rate: number;
     status: string;
     notes: string | null;
     created_at: string;
@@ -53,7 +54,7 @@ export default function QuotePDF({ quoteId }: { quoteId: string }) {
                 const { data: q } = await supabase
                     .from("quotes")
                     .select(
-                        "id, total_amount, status, notes, created_at, client:partners!client_id(name, phone, address, tax_code)"
+                        "id, total_amount, vat_rate, status, notes, created_at, client:partners!client_id(name, phone, address, tax_code)"
                     )
                     .eq("id", quoteId)
                     .single();
@@ -248,10 +249,30 @@ export default function QuotePDF({ quoteId }: { quoteId: string }) {
                         ))}
                     </tbody>
                     <tfoot>
+                        {(quote.vat_rate || 0) > 0 && (() => {
+                            const subtotal = quote.total_amount / (1 + (quote.vat_rate || 0) / 100);
+                            const vatAmt = quote.total_amount - subtotal;
+                            return (
+                                <>
+                                    <tr className="border-t border-slate-100">
+                                        <td colSpan={5} className="px-3 py-2 text-right text-sm text-slate-600">Tạm tính</td>
+                                        <td className="px-3 py-2 text-right text-sm font-medium text-slate-800">
+                                            {formatCurrency(subtotal)}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colSpan={5} className="px-3 py-2 text-right text-sm text-slate-600">VAT ({quote.vat_rate}%)</td>
+                                        <td className="px-3 py-2 text-right text-sm font-medium text-slate-800">
+                                            {formatCurrency(vatAmt)}
+                                        </td>
+                                    </tr>
+                                </>
+                            );
+                        })()}
                         <tr className="border-t-2 border-slate-100">
                             <td colSpan={5} className="px-3 py-4 text-right font-bold text-slate-700">TỔNG CỘNG</td>
                             <td className="px-3 py-4 text-right font-bold text-lg text-primary-600">
-                                {formatCurrency(quote.total_amount)} đ
+                                {formatCurrency(quote.total_amount)}
                             </td>
                         </tr>
                     </tfoot>

@@ -46,6 +46,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
     const [clientId, setClientId] = useState("");
     const [status, setStatus] = useState<"Draft" | "Sent" | "Approved">("Draft");
     const [notes, setNotes] = useState("");
+    const [vatRate, setVatRate] = useState<number>(0);
     const [items, setItems] = useState<QuoteItemRow[]>([]);
     const [serviceModalOpen, setServiceModalOpen] = useState(false);
     const [serviceModalForIndex, setServiceModalForIndex] = useState<number | null>(null);
@@ -79,6 +80,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                     setClientId(quote.client_id as string);
                     setStatus(quote.status as "Draft" | "Sent" | "Approved");
                     setNotes((quote.notes as string) || "");
+                    setVatRate(Number(quote.vat_rate) || 0);
 
                     const { data: qItems } = await supabase
                         .from("quote_items")
@@ -203,6 +205,8 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
     }
 
     const totalAmount = items.reduce((sum, item) => sum + item.line_total, 0);
+    const vatAmount = totalAmount * (vatRate / 100);
+    const grandTotal = totalAmount + vatAmount;
 
     function formatCurrency(amount: number) {
         return new Intl.NumberFormat("vi-VN", {
@@ -247,7 +251,8 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                 .from("quotes")
                 .update({
                     client_id: clientId,
-                    total_amount: totalAmount,
+                    total_amount: grandTotal,
+                    vat_rate: vatRate,
                     status: finalStatus,
                     notes: notes || null,
                 })
@@ -289,7 +294,8 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                 .from("quotes")
                 .insert({
                     client_id: clientId,
-                    total_amount: totalAmount,
+                    total_amount: grandTotal,
+                    vat_rate: vatRate,
                     status: finalStatus,
                     notes: notes || null,
                     created_by: user.id,
@@ -599,13 +605,33 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                     </div>
                 )}
 
-                {/* Total */}
+                {/* Total Summary */}
                 {items.length > 0 && (
-                    <div className="flex items-center justify-between p-4 bg-slate-50 border-t border-slate-200 rounded-b-xl">
-                        <span className="font-semibold text-slate-700">Tổng cộng</span>
-                        <span className="text-xl font-bold text-primary-600">
-                            {formatCurrency(totalAmount)}
-                        </span>
+                    <div className="p-4 bg-slate-50 border-t border-slate-200 rounded-b-xl space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-slate-600">Tạm tính</span>
+                            <span className="font-medium text-slate-800">{formatCurrency(totalAmount)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                                <span className="text-slate-600">Thuế VAT</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    value={vatRate}
+                                    onChange={(e) => setVatRate(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                                    className="input text-sm w-16 text-center py-0.5 px-1"
+                                />
+                                <span className="text-slate-500">%</span>
+                            </div>
+                            <span className="font-medium text-slate-800">{formatCurrency(vatAmount)}</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                            <span className="font-semibold text-slate-700">Tổng cộng (đã gồm VAT)</span>
+                            <span className="text-xl font-bold text-primary-600">{formatCurrency(grandTotal)}</span>
+                        </div>
                     </div>
                 )}
             </div>

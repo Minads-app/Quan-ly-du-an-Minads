@@ -15,6 +15,7 @@ import Link from "next/link";
 interface QuoteData {
     id: string;
     total_amount: number;
+    vat_rate: number;
     status: string;
     notes: string | null;
     created_at: string;
@@ -46,7 +47,7 @@ export default function QuoteDetail({ quoteId }: { quoteId: string }) {
             const { data: q } = await supabase
                 .from("quotes")
                 .select(
-                    "id, total_amount, status, notes, created_at, client:partners!client_id(name, phone, address), creator:profiles!created_by(full_name, email)"
+                    "id, total_amount, vat_rate, status, notes, created_at, client:partners!client_id(name, phone, address), creator:profiles!created_by(full_name, email)"
                 )
                 .eq("id", quoteId)
                 .single();
@@ -260,11 +261,29 @@ export default function QuoteDetail({ quoteId }: { quoteId: string }) {
                         </tbody>
                     </table>
                 </div>
-                <div className="flex items-center justify-between p-4 bg-slate-50 border-t border-slate-200 rounded-b-xl">
-                    <span className="font-semibold text-slate-700">Tổng cộng</span>
-                    <span className="text-xl font-bold text-primary-600">
-                        {formatCurrency(quote.total_amount)}
-                    </span>
+                <div className="p-4 bg-slate-50 border-t border-slate-200 rounded-b-xl space-y-1">
+                    {(quote.vat_rate || 0) > 0 && (() => {
+                        const subtotal = quote.total_amount / (1 + (quote.vat_rate || 0) / 100);
+                        const vatAmt = quote.total_amount - subtotal;
+                        return (
+                            <>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-slate-600">Tạm tính</span>
+                                    <span className="font-medium text-slate-800">{formatCurrency(subtotal)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-slate-600">VAT ({quote.vat_rate}%)</span>
+                                    <span className="font-medium text-slate-800">{formatCurrency(vatAmt)}</span>
+                                </div>
+                            </>
+                        );
+                    })()}
+                    <div className="flex items-center justify-between pt-1">
+                        <span className="font-semibold text-slate-700">Tổng cộng</span>
+                        <span className="text-xl font-bold text-primary-600">
+                            {formatCurrency(quote.total_amount)}
+                        </span>
+                    </div>
                 </div>
             </div>
 

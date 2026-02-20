@@ -10,3 +10,6 @@ ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS description TEXT;
 
 -- 2. Cho phép service_id = NULL (nhập tự do)
 ALTER TABLE quote_items ALTER COLUMN service_id DROP NOT NULL;
+
+-- 3. Thêm cột VAT cho bảng quotes
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS vat_rate NUMERIC(5,2) NOT NULL DEFAULT 0;
