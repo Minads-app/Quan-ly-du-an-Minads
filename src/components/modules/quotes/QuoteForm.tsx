@@ -661,22 +661,35 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                 <Link href="/quotes" className="btn-secondary flex-1 text-center">
                     Hủy
                 </Link>
-                <button
-                    onClick={() => handleSave("Draft")}
-                    disabled={saving}
-                    className="btn-secondary flex-1"
-                >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Lưu nháp
-                </button>
-                <button
-                    onClick={() => handleSave("Sent")}
-                    disabled={saving}
-                    className="btn-primary flex-1"
-                >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Gửi báo giá
-                </button>
+                {isEditing ? (
+                    <button
+                        onClick={() => handleSave()}
+                        disabled={saving}
+                        className="btn-primary flex-1"
+                    >
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Cập nhật
+                    </button>
+                ) : (
+                    <>
+                        <button
+                            onClick={() => handleSave("Draft")}
+                            disabled={saving}
+                            className="btn-secondary flex-1"
+                        >
+                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            Lưu nháp
+                        </button>
+                        <button
+                            onClick={() => handleSave("Sent")}
+                            disabled={saving}
+                            className="btn-primary flex-1"
+                        >
+                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                            Gửi báo giá
+                        </button>
+                    </>
+                )}
             </div>
         </div>
     );
