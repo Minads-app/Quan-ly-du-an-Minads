@@ -12,14 +12,21 @@ import {
     Loader2,
     FileText,
     LinkIcon,
+    Receipt,
+    TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
 import ContractCostModal from "@/components/modules/contracts/ContractCostModal";
-import type { Contract, ContractCost } from "@/types/database";
+import TransactionModal from "@/components/modules/contracts/TransactionModal";
+import type { Contract, ContractCost, Transaction } from "@/types/database";
 
 interface ContractCostRow extends ContractCost {
     supplier: { name: string } | null;
+}
+
+interface TransactionRow extends Transaction {
+    partner: { name: string } | null;
 }
 
 interface ExtendedContract extends Contract {
@@ -44,6 +51,13 @@ export default function ContractDetail() {
     const [editingCost, setEditingCost] = useState<ContractCost | null>(null);
     const [deleteCost, setDeleteCost] = useState<ContractCost | null>(null);
     const [deletingCost, setDeletingCost] = useState(false);
+
+    // Payments state
+    const [payments, setPayments] = useState<TransactionRow[]>([]);
+    const [loadingPayments, setLoadingPayments] = useState(true);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [deletePayment, setDeletePayment] = useState<TransactionRow | null>(null);
+    const [deletingPayment, setDeletingPayment] = useState(false);
 
     // Fetch Contract Info
     useEffect(() => {
@@ -96,7 +110,30 @@ export default function ContractDetail() {
         if (activeTab === "costs") {
             fetchCosts();
         }
+        if (activeTab === "payments") {
+            fetchPayments();
+        }
     }, [activeTab, fetchCosts]);
+
+    // Fetch Payments
+    const fetchPayments = useCallback(async () => {
+        if (!contractId) return;
+        setLoadingPayments(true);
+        const { data } = await supabase
+            .from("transactions")
+            .select("*, partner:partners!partner_id(name)")
+            .eq("contract_id", contractId)
+            .eq("type", "RECEIPT")
+            .order("transaction_date", { ascending: false });
+        if (data) {
+            const fixedData = data.map((item: any) => ({
+                ...item,
+                partner: Array.isArray(item.partner) ? item.partner[0] : item.partner,
+            }));
+            setPayments(fixedData as TransactionRow[]);
+        }
+        setLoadingPayments(false);
+    }, [contractId, supabase]);
 
     async function handleDeleteCost() {
         if (!deleteCost) return;
@@ -106,6 +143,29 @@ export default function ContractDetail() {
         setCosts((prev) => prev.filter((c) => c.id !== deleteCost.id));
         setDeletingCost(false);
         setDeleteCost(null);
+    }
+
+    async function handleDeletePayment() {
+        if (!deletePayment) return;
+        setDeletingPayment(true);
+        // Revert debt paid_amount
+        if (deletePayment.debt_id) {
+            const { data: debt } = await supabase
+                .from("debts")
+                .select("paid_amount")
+                .eq("id", deletePayment.debt_id)
+                .single();
+            if (debt) {
+                await supabase
+                    .from("debts")
+                    .update({ paid_amount: Math.max(0, debt.paid_amount - deletePayment.amount) })
+                    .eq("id", deletePayment.debt_id);
+            }
+        }
+        await supabase.from("transactions").delete().eq("id", deletePayment.id);
+        setPayments((prev) => prev.filter((p) => p.id !== deletePayment.id));
+        setDeletingPayment(false);
+        setDeletePayment(null);
     }
 
     function handleEditCost(cost: ContractCostRow) {
@@ -159,6 +219,7 @@ export default function ContractDetail() {
     }
 
     const totalCost = costs.reduce((sum, item) => sum + item.amount, 0);
+    const totalPaid = payments.reduce((sum, item) => sum + item.amount, 0);
 
     if (loadingContract) {
         return (
@@ -223,6 +284,15 @@ export default function ContractDetail() {
                     >
                         Chi phí thực hiện
                     </button>
+                    <button
+                        onClick={() => setActiveTab("payments")}
+                        className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "payments"
+                            ? "border-primary-600 text-primary-600"
+                            : "border-transparent text-slate-500 hover:text-slate-700"
+                            }`}
+                    >
+                        Thanh toán
+                    </button>
                 </nav>
             </div>
 
@@ -283,10 +353,10 @@ export default function ContractDetail() {
                                     <div className="w-full bg-slate-100 rounded-full h-2.5">
                                         <div
                                             className={`h-2.5 rounded-full transition-all ${(totalCost / contract.total_value) > 0.9
-                                                    ? "bg-red-500"
-                                                    : (totalCost / contract.total_value) > 0.7
-                                                        ? "bg-amber-500"
-                                                        : "bg-green-500"
+                                                ? "bg-red-500"
+                                                : (totalCost / contract.total_value) > 0.7
+                                                    ? "bg-amber-500"
+                                                    : "bg-green-500"
                                                 }`}
                                             style={{ width: `${Math.min((totalCost / contract.total_value) * 100, 100)}%` }}
                                         />
@@ -449,6 +519,146 @@ export default function ContractDetail() {
                 </div>
             )}
 
+            {/* Payments Tab */}
+            {activeTab === "payments" && (
+                <div className="animate-fade-in">
+                    {/* Payment progress */}
+                    <div className="card p-6 mb-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                                    <TrendingUp className="w-5 h-5 text-green-500" />
+                                    Tiến độ thanh toán
+                                </h3>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    Đã thu {formatCurrency(totalPaid)} / {formatCurrency(contract.total_value)}
+                                </p>
+                            </div>
+                            <div className="text-right">
+                                <span className={`text-2xl font-bold ${totalPaid >= contract.total_value ? "text-green-600" : "text-amber-600"}`}>
+                                    {contract.total_value > 0 ? ((totalPaid / contract.total_value) * 100).toFixed(1) : 0}%
+                                </span>
+                            </div>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-3">
+                            <div
+                                className={`h-3 rounded-full transition-all ${totalPaid >= contract.total_value
+                                        ? "bg-green-500"
+                                        : (totalPaid / contract.total_value) > 0.5
+                                            ? "bg-amber-500"
+                                            : "bg-blue-500"
+                                    }`}
+                                style={{ width: `${Math.min((totalPaid / contract.total_value) * 100, 100)}%` }}
+                            />
+                        </div>
+                        <div className="flex justify-between mt-2 text-xs text-slate-500">
+                            <span>Còn lại: {formatCurrency(Math.max(0, contract.total_value - totalPaid))}</span>
+                            <span>{payments.length} đợt thanh toán</span>
+                        </div>
+                    </div>
+
+                    {/* Add payment button */}
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-slate-900">Lịch sử thanh toán</h3>
+                        <button onClick={() => setIsPaymentModalOpen(true)} className="btn-primary">
+                            <Plus className="w-4 h-4" />
+                            Tạo phiếu thu
+                        </button>
+                    </div>
+
+                    {loadingPayments ? (
+                        <div className="flex justify-center py-12">
+                            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                        </div>
+                    ) : payments.length === 0 ? (
+                        <div className="card p-8 text-center text-slate-500">
+                            Chưa có đợt thanh toán nào.
+                            <br />
+                            <button
+                                onClick={() => setIsPaymentModalOpen(true)}
+                                className="mt-2 text-primary-600 hover:underline text-sm"
+                            >
+                                Tạo phiếu thu đầu tiên
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Mobile Cards */}
+                            <div className="space-y-3 lg:hidden">
+                                {payments.map((p) => (
+                                    <div key={p.id} className="card p-4">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <Receipt className="w-4 h-4 text-green-500" />
+                                                    <span className="font-medium text-slate-900">{p.partner?.name}</span>
+                                                </div>
+                                                <p className="text-xs text-slate-500 mt-0.5">
+                                                    {formatDate(p.transaction_date)}
+                                                </p>
+                                            </div>
+                                            <span className="text-lg font-bold text-green-600">
+                                                +{formatCurrency(p.amount)}
+                                            </span>
+                                        </div>
+                                        {p.description && (
+                                            <p className="text-sm text-slate-600 mb-2">{p.description}</p>
+                                        )}
+                                        <div className="flex justify-end pt-2 border-t border-slate-100">
+                                            <button
+                                                onClick={() => setDeletePayment(p)}
+                                                className="btn-sm bg-red-50 text-red-600 hover:bg-red-100 border-red-100"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Desktop Table */}
+                            <div className="hidden lg:block card overflow-hidden">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Ngày</th>
+                                            <th>Đối tác</th>
+                                            <th>Nội dung</th>
+                                            <th className="text-right">Số tiền</th>
+                                            <th className="text-right w-16">...</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {payments.map((p) => (
+                                            <tr key={p.id}>
+                                                <td className="whitespace-nowrap">{formatDate(p.transaction_date)}</td>
+                                                <td className="font-medium">{p.partner?.name}</td>
+                                                <td className="max-w-[200px] truncate text-sm" title={p.description || ""}>
+                                                    {p.description || "—"}
+                                                </td>
+                                                <td className="text-right font-bold text-green-600">
+                                                    +{formatCurrency(p.amount)}
+                                                </td>
+                                                <td>
+                                                    <div className="flex justify-end">
+                                                        <button
+                                                            onClick={() => setDeletePayment(p)}
+                                                            className="p-1.5 rounded text-slate-400 hover:text-red-600"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
+
             <ContractCostModal
                 contractId={contractId}
                 contractName={contract.name}
@@ -458,6 +668,18 @@ export default function ContractDetail() {
                 onSaved={fetchCosts}
             />
 
+            <TransactionModal
+                transaction={null}
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                onSaved={() => {
+                    fetchPayments();
+                }}
+                defaultType="RECEIPT"
+                defaultPartnerId={contract.client_id}
+                defaultContractId={contractId}
+            />
+
             {deleteCost && (
                 <DeleteConfirm
                     title="Xóa chi phí"
@@ -465,6 +687,16 @@ export default function ContractDetail() {
                     loading={deletingCost}
                     onConfirm={handleDeleteCost}
                     onCancel={() => setDeleteCost(null)}
+                />
+            )}
+
+            {deletePayment && (
+                <DeleteConfirm
+                    title="Xóa phiếu thu"
+                    message="Bạn có chắc muốn xóa phiếu thu này? Số tiền đã ghi nhận vào công nợ sẽ được hoàn trả."
+                    loading={deletingPayment}
+                    onConfirm={handleDeletePayment}
+                    onCancel={() => setDeletePayment(null)}
                 />
             )}
         </div>

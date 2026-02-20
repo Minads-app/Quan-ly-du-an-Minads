@@ -10,6 +10,7 @@ export type QuoteStatus = "Draft" | "Sent" | "Approved";
 export type ProjectType = "THI_CONG" | "DICH_VU";
 export type ProjectStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "ON_HOLD" | "CANCELLED";
 export type DebtType = "RECEIVABLE" | "PAYABLE";
+export type TransactionType = "RECEIPT" | "PAYMENT";
 
 // ---- Row types (dữ liệu trả về từ DB) ----
 
@@ -124,6 +125,19 @@ export interface Debt {
     updated_at: string;
 }
 
+export interface Transaction {
+    id: string;
+    type: TransactionType;
+    partner_id: string;
+    contract_id: string | null;
+    debt_id: string | null;
+    amount: number;
+    transaction_date: string;
+    description: string | null;
+    created_by: string;
+    created_at: string;
+}
+
 // ---- Insert types (dữ liệu gửi lên khi tạo mới) ----
 
 export type ProfileInsert = Omit<Profile, "created_at" | "updated_at">;
@@ -136,6 +150,7 @@ export type ProjectInsert = Omit<Project, "id" | "created_at" | "updated_at">;
 export type ProjectCostInsert = Omit<ProjectCost, "id" | "created_at">;
 export type ContractCostInsert = Omit<ContractCost, "id" | "created_at">;
 export type DebtInsert = Omit<Debt, "id" | "created_at" | "updated_at">;
+export type TransactionInsert = Omit<Transaction, "id" | "created_at">;
 
 // ---- Update types ----
 
@@ -149,6 +164,7 @@ export type ProjectUpdate = Partial<ProjectInsert>;
 export type ProjectCostUpdate = Partial<ProjectCostInsert>;
 export type ContractCostUpdate = Partial<ContractCostInsert>;
 export type DebtUpdate = Partial<DebtInsert>;
+export type TransactionUpdate = Partial<TransactionInsert>;
 
 // ---- Database type cho Supabase client ----
 
@@ -215,6 +231,12 @@ export interface Database {
                 Update: DebtUpdate;
                 Relationships: [];
             };
+            transactions: {
+                Row: Transaction;
+                Insert: TransactionInsert;
+                Update: TransactionUpdate;
+                Relationships: [];
+            };
         };
         Views: Record<string, never>;
         Functions: Record<string, never>;
@@ -226,6 +248,7 @@ export interface Database {
             project_type: ProjectType;
             project_status: ProjectStatus;
             debt_type: DebtType;
+            transaction_type: TransactionType;
         };
         CompositeTypes: Record<string, never>;
     };

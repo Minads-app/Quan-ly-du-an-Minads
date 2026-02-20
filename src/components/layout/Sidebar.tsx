@@ -10,6 +10,7 @@ import {
     FileSignature,
     FolderKanban,
     Wallet,
+    Receipt,
     ChevronLeft,
     ChevronRight,
     Settings,
@@ -35,6 +36,12 @@ const navItems: NavItem[] = [
         label: "Công nợ",
         href: "/debts",
         icon: Wallet,
+        roles: ["Admin", "Accountant"],
+    },
+    {
+        label: "Thu chi",
+        href: "/transactions",
+        icon: Receipt,
         roles: ["Admin", "Accountant"],
     },
     {
