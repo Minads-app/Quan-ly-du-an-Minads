@@ -1,0 +1,13 @@
+@echo off
+echo Adding all changes to git...
+git add .
+echo Committing changes...
+git commit -m "Fix: Add Settings module and dependencies (sonner)"
+echo Pushing to GitHub...
+git push origin main
+if %errorlevel% neq 0 (
+    echo Push to main failed, trying master...
+    git push origin master
+)
+echo Done! Please go to Vercel dashboard to check the new build.
+pause
