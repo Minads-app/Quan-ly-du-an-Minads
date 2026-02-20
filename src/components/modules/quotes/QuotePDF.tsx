@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, Download, Loader2, Printer } from "lucide-react";
 import Link from "next/link";
+import { getSettings } from "@/lib/actions/settings"; // Or just fetch via supabase client
 
 interface QuoteData {
     id: string;
@@ -23,38 +24,67 @@ interface QuoteItemData {
     service: { name: string; unit: string } | null;
 }
 
+interface OrganizationSettings {
+    name: string;
+    address: string;
+    phone: string;
+    email: string;
+    website: string;
+    tax_id: string;
+    bank_info: string;
+    logo_url: string;
+}
+
 export default function QuotePDF({ quoteId }: { quoteId: string }) {
     const supabase = createClient();
     const printRef = useRef<HTMLDivElement>(null);
     const [quote, setQuote] = useState<QuoteData | null>(null);
     const [items, setItems] = useState<QuoteItemData[]>([]);
+    const [settings, setSettings] = useState<OrganizationSettings | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function load() {
-            const { data: q } = await supabase
-                .from("quotes")
-                .select(
-                    "id, total_amount, status, notes, created_at, client:partners!client_id(name, phone, address, tax_code)"
-                )
-                .eq("id", quoteId)
-                .single();
+            try {
+                // Load Quote
+                const { data: q } = await supabase
+                    .from("quotes")
+                    .select(
+                        "id, total_amount, status, notes, created_at, client:partners!client_id(name, phone, address, tax_code)"
+                    )
+                    .eq("id", quoteId)
+                    .single();
 
-            if (q) setQuote(q as unknown as QuoteData);
+                if (q) setQuote(q as unknown as QuoteData);
 
-            const { data: qi } = await supabase
-                .from("quote_items")
-                .select(
-                    "id, quantity, unit_price, discount, line_total, service:services!service_id(name, unit)"
-                )
-                .eq("quote_id", quoteId)
-                .order("created_at");
+                // Load items
+                const { data: qi } = await supabase
+                    .from("quote_items")
+                    .select(
+                        "id, quantity, unit_price, discount, line_total, service:services!service_id(name, unit)"
+                    )
+                    .eq("quote_id", quoteId)
+                    .order("created_at");
 
-            if (qi) setItems(qi as unknown as QuoteItemData[]);
-            setLoading(false);
+                if (qi) setItems(qi as unknown as QuoteItemData[]);
+
+                // Load Settings
+                const { data: s } = await supabase
+                    .from("organization_settings")
+                    .select("*")
+                    .eq("id", 1)
+                    .single();
+
+                if (s) setSettings(s);
+
+            } catch (error) {
+                console.error("Error loading quote data:", error);
+            } finally {
+                setLoading(false);
+            }
         }
         load();
-    }, [quoteId]);
+    }, [quoteId, supabase]);
 
     function formatCurrency(amount: number) {
         return new Intl.NumberFormat("vi-VN").format(amount);
@@ -81,12 +111,12 @@ export default function QuotePDF({ quoteId }: { quoteId: string }) {
     }
 
     if (!quote) {
-        return <div className="text-center py-16 text-slate-500">Không tìm thấy</div>;
+        return <div className="text-center py-16 text-slate-500">Không tìm thấy báo giá</div>;
     }
 
     return (
         <div>
-            {/* Toolbar - ẩn khi in */}
+            {/* Toolbar - hidden on print */}
             <div className="print:hidden flex items-center justify-between mb-4">
                 <Link
                     href={`/quotes/${quoteId}`}
@@ -106,138 +136,154 @@ export default function QuotePDF({ quoteId }: { quoteId: string }) {
             {/* Print content */}
             <div
                 ref={printRef}
-                className="bg-white max-w-[210mm] mx-auto p-8 print:p-0 print:max-w-none print:shadow-none shadow-lg rounded-lg"
+                className="bg-white max-w-[210mm] mx-auto p-8 print:p-0 print:max-w-none print:shadow-none shadow-lg rounded-lg min-h-[297mm] flex flex-col"
                 style={{ fontFamily: "'Inter', sans-serif" }}
             >
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-wider">
-                        BÁO GIÁ
-                    </h1>
-                    <p className="text-sm text-slate-500 mt-1">
-                        Ngày: {formatDate(quote.created_at)}
-                    </p>
+                {/* Header with Company Info */}
+                <div className="flex justify-between items-start mb-12 border-b border-slate-200 pb-6">
+                    <div className="max-w-[60%]">
+                        {settings?.logo_url ? (
+                            <img
+                                src={settings.logo_url}
+                                alt="Company Logo"
+                                className="h-16 w-auto object-contain mb-3"
+                            />
+                        ) : (
+                            <div className="h-16 w-16 bg-slate-100 flex items-center justify-center rounded-lg mb-3">
+                                <span className="font-bold text-slate-400">LOGO</span>
+                            </div>
+                        )}
+                        <h3 className="font-bold text-lg uppercase text-slate-800">
+                            {settings?.name || "CÔNG TY TNHH MINADS"}
+                        </h3>
+                        <div className="text-xs text-slate-600 space-y-1 mt-1">
+                            {settings?.address && <p>{settings.address}</p>}
+                            <p>
+                                {settings?.tax_id && `MST: ${settings.tax_id}`}
+                                {settings?.tax_id && settings?.phone && " - "}
+                                {settings?.phone && `Hotline: ${settings.phone}`}
+                            </p>
+                            <p>
+                                {settings?.email && `Email: ${settings.email}`}
+                                {settings?.email && settings?.website && " - "}
+                                {settings?.website && `Web: ${settings.website}`}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="text-right">
+                        <h1 className="text-2xl font-bold text-primary-700 uppercase tracking-wider mb-2">
+                            BÁO GIÁ
+                        </h1>
+                        <p className="text-sm text-slate-500">
+                            Số: #{quote.id.slice(0, 8).toUpperCase()}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                            Ngày: {formatDate(quote.created_at)}
+                        </p>
+                    </div>
                 </div>
 
                 {/* Client info */}
-                <div className="mb-6 border border-slate-200 rounded-lg p-4">
-                    <h2 className="text-sm font-semibold text-slate-500 uppercase mb-2">
-                        Thông tin khách hàng
-                    </h2>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                            <span className="text-slate-400">Tên: </span>
-                            <span className="font-medium">{quote.client?.name || "—"}</span>
-                        </div>
-                        <div>
-                            <span className="text-slate-400">SĐT: </span>
-                            <span className="font-medium">{quote.client?.phone || "—"}</span>
-                        </div>
-                        <div className="col-span-2">
-                            <span className="text-slate-400">Địa chỉ: </span>
-                            <span className="font-medium">{quote.client?.address || "—"}</span>
-                        </div>
-                        {quote.client?.tax_code && (
-                            <div>
-                                <span className="text-slate-400">MST: </span>
-                                <span className="font-medium">{quote.client.tax_code}</span>
+                <div className="mb-8">
+                    <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
+                        <h2 className="text-xs font-bold text-slate-500 uppercase mb-3 tracking-wide">
+                            Thông tin khách hàng
+                        </h2>
+                        <div className="grid grid-cols-2 gap-y-2 gap-x-8 text-sm">
+                            <div className="flex">
+                                <span className="text-slate-500 w-24 flex-shrink-0">Khách hàng:</span>
+                                <span className="font-semibold text-slate-900">{quote.client?.name || "—"}</span>
                             </div>
-                        )}
+                            <div className="flex">
+                                <span className="text-slate-500 w-20 flex-shrink-0">Điện thoại:</span>
+                                <span className="text-slate-900">{quote.client?.phone || "—"}</span>
+                            </div>
+                            <div className="col-span-2 flex">
+                                <span className="text-slate-500 w-24 flex-shrink-0">Địa chỉ:</span>
+                                <span className="text-slate-900">{quote.client?.address || "—"}</span>
+                            </div>
+                            {quote.client?.tax_code && (
+                                <div className="col-span-2 flex">
+                                    <span className="text-slate-500 w-24 flex-shrink-0">Mã số thuế:</span>
+                                    <span className="text-slate-900">{quote.client.tax_code}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
                 {/* Items table */}
-                <table className="w-full text-sm border-collapse mb-6">
+                <table className="w-full text-sm border-collapse mb-8 flex-1">
                     <thead>
-                        <tr className="bg-slate-100">
-                            <th className="border border-slate-300 px-3 py-2 text-left w-10">
-                                STT
-                            </th>
-                            <th className="border border-slate-300 px-3 py-2 text-left">
-                                Hạng mục
-                            </th>
-                            <th className="border border-slate-300 px-3 py-2 text-center w-16">
-                                ĐVT
-                            </th>
-                            <th className="border border-slate-300 px-3 py-2 text-right w-16">
-                                SL
-                            </th>
-                            <th className="border border-slate-300 px-3 py-2 text-right w-28">
-                                Đơn giá
-                            </th>
-                            <th className="border border-slate-300 px-3 py-2 text-right w-16">
-                                CK (%)
-                            </th>
-                            <th className="border border-slate-300 px-3 py-2 text-right w-32">
-                                Thành tiền
-                            </th>
+                        <tr className="bg-primary-50 text-primary-900">
+                            <th className="border-b-2 border-primary-100 px-3 py-3 text-center w-12 font-semibold">STT</th>
+                            <th className="border-b-2 border-primary-100 px-3 py-3 text-left font-semibold">Hạng mục & Mô tả</th>
+                            <th className="border-b-2 border-primary-100 px-3 py-3 text-center w-20 font-semibold">ĐVT</th>
+                            <th className="border-b-2 border-primary-100 px-3 py-3 text-right w-20 font-semibold">SL</th>
+                            <th className="border-b-2 border-primary-100 px-3 py-3 text-right w-32 font-semibold">Đơn giá</th>
+                            <th className="border-b-2 border-primary-100 px-3 py-3 text-right w-32 font-semibold">Thành tiền</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-100">
                         {items.map((item, idx) => (
-                            <tr key={item.id}>
-                                <td className="border border-slate-300 px-3 py-2 text-center">
-                                    {idx + 1}
+                            <tr key={item.id} className="items-start">
+                                <td className="px-3 py-3 text-center text-slate-500 align-top">{idx + 1}</td>
+                                <td className="px-3 py-3 align-top">
+                                    <p className="font-medium text-slate-800">{item.service?.name || "—"}</p>
+                                    {/* Optional description if added later */}
                                 </td>
-                                <td className="border border-slate-300 px-3 py-2">
-                                    {item.service?.name || "—"}
-                                </td>
-                                <td className="border border-slate-300 px-3 py-2 text-center">
-                                    {item.service?.unit || "—"}
-                                </td>
-                                <td className="border border-slate-300 px-3 py-2 text-right">
-                                    {item.quantity}
-                                </td>
-                                <td className="border border-slate-300 px-3 py-2 text-right">
-                                    {formatCurrency(item.unit_price)}
-                                </td>
-                                <td className="border border-slate-300 px-3 py-2 text-right">
-                                    {item.discount > 0 ? `${item.discount}%` : ""}
-                                </td>
-                                <td className="border border-slate-300 px-3 py-2 text-right font-medium">
+                                <td className="px-3 py-3 text-center text-slate-600 align-top">{item.service?.unit || "—"}</td>
+                                <td className="px-3 py-3 text-right text-slate-800 align-top">{item.quantity}</td>
+                                <td className="px-3 py-3 text-right text-slate-800 align-top">{formatCurrency(item.unit_price)}</td>
+                                <td className="px-3 py-3 text-right font-medium text-slate-900 align-top">
                                     {formatCurrency(item.line_total)}
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                     <tfoot>
-                        <tr className="bg-slate-50 font-bold">
-                            <td
-                                colSpan={6}
-                                className="border border-slate-300 px-3 py-2 text-right"
-                            >
-                                TỔNG CỘNG
-                            </td>
-                            <td className="border border-slate-300 px-3 py-2 text-right text-lg text-primary-600">
+                        <tr className="border-t-2 border-slate-100">
+                            <td colSpan={5} className="px-3 py-4 text-right font-bold text-slate-700">TỔNG CỘNG</td>
+                            <td className="px-3 py-4 text-right font-bold text-lg text-primary-600">
                                 {formatCurrency(quote.total_amount)} đ
                             </td>
                         </tr>
                     </tfoot>
                 </table>
 
-                {/* Notes */}
-                {quote.notes && (
-                    <div className="mb-6">
-                        <p className="text-sm text-slate-500 font-medium mb-1">Ghi chú:</p>
-                        <p className="text-sm text-slate-700">{quote.notes}</p>
+                {/* Footer Section (Bank Info & Signatures) */}
+                <div className="mt-auto">
+                    {/* Notes & Bank Info */}
+                    <div className="grid grid-cols-2 gap-8 mb-12">
+                        <div className="text-sm">
+                            <h4 className="font-semibold text-slate-700 mb-2">Ghi chú:</h4>
+                            <p className="text-slate-600 whitespace-pre-line">{quote.notes || "Báo giá có giá trị trong vòng 15 ngày."}</p>
+                        </div>
+                        {settings?.bank_info && (
+                            <div className="text-sm bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                <h4 className="font-semibold text-slate-700 mb-2">Thông tin thanh toán:</h4>
+                                <p className="text-slate-600 whitespace-pre-line">{settings.bank_info}</p>
+                            </div>
+                        )}
                     </div>
-                )}
 
-                {/* Signatures */}
-                <div className="grid grid-cols-2 gap-8 mt-12 text-center text-sm">
-                    <div>
-                        <p className="font-semibold text-slate-700">KHÁCH HÀNG</p>
-                        <p className="text-xs text-slate-400 mt-1">
-                            (Ký, ghi rõ họ tên)
-                        </p>
-                        <div className="h-20" />
+                    {/* Signatures */}
+                    <div className="grid grid-cols-2 gap-12 text-center text-sm mb-8">
+                        <div>
+                            <p className="font-bold text-slate-800 uppercase">ĐẠI DIỆN KHÁCH HÀNG</p>
+                            <p className="text-xs text-slate-400 mt-1 italic">(Ký, ghi rõ họ tên)</p>
+                            <div className="h-24"></div>
+                        </div>
+                        <div>
+                            <p className="font-bold text-slate-800 uppercase">ĐẠI DIỆN {settings?.name ? settings.name.toUpperCase() : "CÔNG TY"}</p>
+                            <p className="text-xs text-slate-400 mt-1 italic">(Ký, đóng dấu)</p>
+                            <div className="h-24"></div>
+                        </div>
                     </div>
-                    <div>
-                        <p className="font-semibold text-slate-700">ĐƠN VỊ BÁO GIÁ</p>
-                        <p className="text-xs text-slate-400 mt-1">
-                            (Ký, ghi rõ họ tên)
-                        </p>
-                        <div className="h-20" />
+
+                    <div className="text-center text-xs text-slate-400 border-t border-slate-100 pt-4">
+                        Cảm ơn quý khách đã tin tưởng và hợp tác!
                     </div>
                 </div>
             </div>

@@ -12,6 +12,7 @@ import {
     Wallet,
     ChevronLeft,
     ChevronRight,
+    Settings,
 } from "lucide-react";
 import { useState } from "react";
 import type { UserRole } from "@/types/database";
@@ -40,6 +41,12 @@ const navItems: NavItem[] = [
         label: "Nhân viên",
         href: "/admin/users",
         icon: Users,
+        roles: ["Admin"],
+    },
+    {
+        label: "Cài đặt",
+        href: "/settings",
+        icon: Settings,
         roles: ["Admin"],
     },
 ];
