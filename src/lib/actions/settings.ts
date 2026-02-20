@@ -18,7 +18,7 @@ const settingsSchema = z.object({
 export type SettingsFormData = z.infer<typeof settingsSchema>;
 
 export async function getSettings() {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Put singleton ID = 1
     const { data, error } = await supabase
@@ -36,7 +36,7 @@ export async function getSettings() {
 }
 
 export async function updateSettings(data: SettingsFormData) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Check permissions (Admin only)
     const { data: { user } } = await supabase.auth.getUser();
