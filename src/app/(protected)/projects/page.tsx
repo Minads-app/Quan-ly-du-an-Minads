@@ -20,6 +20,7 @@ import type { Project, ProjectStatus, ProjectType } from "@/types/database";
 // Extended interface includes contract info
 interface ProjectRow extends Project {
     contract: { name: string; client: { name: string } | null } | null;
+    assignee: { full_name: string } | null;
 }
 
 export default function ProjectsPage() {
@@ -40,7 +41,7 @@ export default function ProjectsPage() {
         setLoading(true);
         let query = supabase
             .from("projects")
-            .select("*, contract:contracts!contract_id(name, client:partners!client_id(name))")
+            .select("*, contract:contracts!contract_id(name, client:partners!client_id(name)), assignee:profiles!assigned_to(full_name)")
             .order("created_at", { ascending: false });
 
         if (statusFilter !== "ALL") {
@@ -57,6 +58,7 @@ export default function ProjectsPage() {
             const fixedData = data.map((item: any) => ({
                 ...item,
                 contract: Array.isArray(item.contract) ? item.contract[0] : item.contract,
+                assignee: Array.isArray(item.assignee) ? item.assignee[0] : item.assignee,
             }));
 
             let result = fixedData as unknown as ProjectRow[];
@@ -66,7 +68,8 @@ export default function ProjectsPage() {
                     (p) =>
                         p.name.toLowerCase().includes(q) ||
                         p.contract?.name.toLowerCase().includes(q) ||
-                        p.contract?.client?.name.toLowerCase().includes(q)
+                        p.contract?.client?.name.toLowerCase().includes(q) ||
+                        p.assignee?.full_name.toLowerCase().includes(q)
                 );
             }
             setProjects(result);
@@ -208,6 +211,9 @@ export default function ProjectsPage() {
                                     </div>
                                     {getStatusBadge(project.status)}
                                 </div>
+                                <div className="mt-2 text-sm text-slate-600">
+                                    <p>Phụ trách: <strong>{project.assignee?.full_name || "—"}</strong></p>
+                                </div>
                                 <div className="mt-2 pt-2 border-t border-slate-100 flex justify-end gap-2">
                                     <button
                                         onClick={() => handleEdit(project)}
@@ -255,7 +261,9 @@ export default function ProjectsPage() {
                                             </div>
                                         </td>
                                         <td>{getStatusBadge(project.status)}</td>
-                                        <td>{project.assigned_to || "—"}</td>
+                                        <td className="font-medium text-slate-900">
+                                            {project.assignee?.full_name || "—"}
+                                        </td>
                                         <td>
                                             <div className="flex justify-end gap-1">
                                                 <button

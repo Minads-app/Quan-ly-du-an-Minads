@@ -73,7 +73,7 @@ export default function LoginPage() {
                             />
                         </svg>
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-1">ERP Mini</h1>
+                    <h1 className="text-3xl font-bold text-white mb-1">Minads</h1>
                     <p className="text-slate-400 text-sm">
                         Quản lý Hợp đồng · Dự án · Báo giá · Công nợ
                     </p>
@@ -166,7 +166,7 @@ export default function LoginPage() {
 
                 {/* Footer */}
                 <p className="text-center text-slate-500 text-xs mt-6">
-                    © 2026 ERP Mini · Hệ thống quản lý dự án
+                    © 2026 Minads · Hệ thống quản lý dự án
                 </p>
             </div>
         </div>

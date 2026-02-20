@@ -70,7 +70,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                     {!collapsed && (
                         <div className="min-w-0">
                             <h1 className="text-base font-bold text-slate-900 truncate">
-                                ERP Mini
+                                Minads
                             </h1>
                             <p className="text-[10px] text-slate-400 truncate">
                                 Quản lý dự án

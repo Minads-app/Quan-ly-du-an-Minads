@@ -33,7 +33,7 @@ function getPageTitle(pathname: string): string {
             return title;
         }
     }
-    return "ERP Mini";
+    return "Minads";
 }
 
 interface HeaderProps {
@@ -170,8 +170,8 @@ export default function Header({ profile }: HeaderProps) {
                                     key={item.href}
                                     href={item.href}
                                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
-                                            ? "bg-primary-50 text-primary-700"
-                                            : "text-slate-600 hover:bg-slate-50"
+                                        ? "bg-primary-50 text-primary-700"
+                                        : "text-slate-600 hover:bg-slate-50"
                                         }`}
                                 >
                                     <Icon className="w-4 h-4" />
