@@ -58,7 +58,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
     return (
         <aside
-            className={`hidden lg:flex flex-col fixed left-0 top-0 h-screen oklch(82.8% 0.189 84.429) border-r border-slate-200 z-30 transition-all duration-300 ${collapsed ? "w-[72px]" : "w-64"
+            className={`hidden lg:flex flex-col fixed left-0 top-0 h-screen bg-slate-50 border-r border-slate-200 z-30 transition-all duration-300 ${collapsed ? "w-[72px]" : "w-64"
                 }`}
         >
             {/* Logo */}
