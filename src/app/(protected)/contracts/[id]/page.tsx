@@ -29,6 +29,21 @@ interface TransactionRow extends Transaction {
     partner: { name: string } | null;
 }
 
+interface QuoteItemRow {
+    id: string;
+    quote_id: string;
+    service_id: string | null;
+    custom_name: string | null;
+    custom_unit: string | null;
+    description: string | null;
+    quantity: number;
+    unit_price: number;
+    discount: number;
+    line_total: number;
+    created_at: string;
+    service: { name: string; unit: string } | null;
+}
+
 interface ExtendedContract extends Contract {
     client: { name: string } | null;
 }
@@ -58,6 +73,12 @@ export default function ContractDetail() {
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [deletePayment, setDeletePayment] = useState<TransactionRow | null>(null);
     const [deletingPayment, setDeletingPayment] = useState(false);
+
+    // Quote Details state
+    const [quoteItems, setQuoteItems] = useState<QuoteItemRow[]>([]);
+    const [loadingQuoteDetails, setLoadingQuoteDetails] = useState(false);
+    const [quoteVatRate, setQuoteVatRate] = useState<number>(0);
+    const [quoteSubtotal, setQuoteSubtotal] = useState<number>(0);
 
     // Fetch Contract Info
     useEffect(() => {
@@ -113,7 +134,44 @@ export default function ContractDetail() {
         if (activeTab === "payments") {
             fetchPayments();
         }
+        if (activeTab === "quote_details") {
+            fetchQuoteDetails();
+        }
     }, [activeTab, fetchCosts]);
+
+    // Fetch Quote Details
+    const fetchQuoteDetails = useCallback(async () => {
+        if (!contract?.quote_id) return;
+        setLoadingQuoteDetails(true);
+
+        const { data: quote } = await supabase
+            .from("quotes")
+            .select("total_amount, vat_rate")
+            .eq("id", contract.quote_id)
+            .single();
+
+        if (quote) {
+            setQuoteVatRate(quote.vat_rate || 0);
+        }
+
+        const { data: items } = await supabase
+            .from("quote_items")
+            .select("*, service:services!service_id(name, unit)")
+            .eq("quote_id", contract.quote_id)
+            .order("created_at", { ascending: true });
+
+        if (items) {
+            const fixedData = items.map((item: any) => ({
+                ...item,
+                service: Array.isArray(item.service) ? item.service[0] : item.service,
+            }));
+            setQuoteItems(fixedData as QuoteItemRow[]);
+
+            const subtotal = fixedData.reduce((sum, item) => sum + item.line_total, 0);
+            setQuoteSubtotal(subtotal);
+        }
+        setLoadingQuoteDetails(false);
+    }, [contract?.quote_id, supabase]);
 
     // Fetch Payments
     const fetchPayments = useCallback(async () => {
@@ -285,6 +343,15 @@ export default function ContractDetail() {
                         Chi phí thực hiện
                     </button>
                     <button
+                        onClick={() => setActiveTab("quote_details")}
+                        className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "quote_details"
+                            ? "border-primary-600 text-primary-600"
+                            : "border-transparent text-slate-500 hover:text-slate-700"
+                            }`}
+                    >
+                        Chi tiết hợp đồng
+                    </button>
+                    <button
                         onClick={() => setActiveTab("payments")}
                         className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "payments"
                             ? "border-primary-600 text-primary-600"
@@ -320,6 +387,14 @@ export default function ContractDetail() {
                                     {contract.notes || "Không có ghi chú"}
                                 </p>
                             </div>
+                            {contract.quote_id && (
+                                <div className="pt-2">
+                                    <span className="text-slate-500 block mb-1">Báo giá tham chiếu</span>
+                                    <Link href={`/quotes`} className="text-sm font-medium text-primary-600 hover:underline">
+                                        Xem báo giá #{contract.quote_id.substring(0, 6)}
+                                    </Link>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -543,10 +618,10 @@ export default function ContractDetail() {
                         <div className="w-full bg-slate-100 rounded-full h-3">
                             <div
                                 className={`h-3 rounded-full transition-all ${totalPaid >= contract.total_value
-                                        ? "bg-green-500"
-                                        : (totalPaid / contract.total_value) > 0.5
-                                            ? "bg-amber-500"
-                                            : "bg-blue-500"
+                                    ? "bg-green-500"
+                                    : (totalPaid / contract.total_value) > 0.5
+                                        ? "bg-amber-500"
+                                        : "bg-blue-500"
                                     }`}
                                 style={{ width: `${Math.min((totalPaid / contract.total_value) * 100, 100)}%` }}
                             />
@@ -654,6 +729,90 @@ export default function ContractDetail() {
                                     </tbody>
                                 </table>
                             </div>
+                        </>
+                    )}
+                </div>
+            )}
+
+            {/* Quote Details Tab */}
+            {activeTab === "quote_details" && (
+                <div className="animate-fade-in card overflow-hidden">
+                    <div className="p-4 border-b border-slate-200">
+                        <h3 className="text-lg font-semibold text-slate-900">Chi tiết hợp đồng</h3>
+                        {!contract.quote_id && (
+                            <p className="text-sm text-amber-600 mt-1">Hợp đồng này không được tạo từ báo giá nào.</p>
+                        )}
+                    </div>
+                    {contract.quote_id && (
+                        <>
+                            {loadingQuoteDetails ? (
+                                <div className="flex justify-center py-12">
+                                    <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                                </div>
+                            ) : quoteItems.length === 0 ? (
+                                <div className="p-8 text-center text-slate-500">
+                                    Báo giá này không có hạng mục nào.
+                                </div>
+                            ) : (
+                                <div>
+                                    {/* Desktop Table (for quote items) */}
+                                    <div className="overflow-x-auto">
+                                        <table className="table min-w-full">
+                                            <thead>
+                                                <tr>
+                                                    <th className="w-12 text-center">STT</th>
+                                                    <th>Hạng mục / Dịch vụ</th>
+                                                    <th className="text-center">ĐVT</th>
+                                                    <th className="text-right">Số lượng</th>
+                                                    <th className="text-right">Đơn giá</th>
+                                                    <th className="text-right">CK (%)</th>
+                                                    <th className="text-right">Thành tiền</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {quoteItems.map((item, index) => {
+                                                    const name = item.custom_name || item.service?.name || "—";
+                                                    const unit = item.custom_unit || item.service?.unit || "—";
+                                                    return (
+                                                        <tr key={item.id}>
+                                                            <td className="text-center text-slate-500">{index + 1}</td>
+                                                            <td>
+                                                                <div className="font-medium text-slate-900">{name}</div>
+                                                                {item.description && (
+                                                                    <div className="text-xs text-slate-500 mt-1 line-clamp-2" title={item.description}>
+                                                                        {item.description}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className="text-center">{unit}</td>
+                                                            <td className="text-right">{item.quantity}</td>
+                                                            <td className="text-right">{formatCurrency(item.unit_price)}</td>
+                                                            <td className="text-right">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
+                                                            <td className="text-right font-medium text-primary-600">{formatCurrency(item.line_total)}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 border-t border-slate-200">
+                                        <div className="space-y-2 max-w-sm ml-auto">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-slate-500">Tạm tính:</span>
+                                                <span className="font-medium">{formatCurrency(quoteSubtotal)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-slate-500">Thuế VAT ({quoteVatRate}%):</span>
+                                                <span className="font-medium">{formatCurrency(quoteSubtotal * (quoteVatRate / 100))}</span>
+                                            </div>
+                                            <div className="flex justify-between font-bold text-lg pt-2 border-t border-slate-200">
+                                                <span className="text-slate-700">Tổng cộng:</span>
+                                                <span className="text-primary-600">{formatCurrency(quoteSubtotal * (1 + quoteVatRate / 100))}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>

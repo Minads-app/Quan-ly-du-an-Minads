@@ -13,10 +13,10 @@ import {
 } from "lucide-react";
 import type { Contract, Partner } from "@/types/database";
 
-// Schema validation thủ công vì chưa có trong validators.ts cho Contract
 const contractSchema = z.object({
     name: z.string().min(1, "Vui lòng nhập tên hợp đồng"),
     client_id: z.string().min(1, "Vui lòng chọn khách hàng"),
+    quote_id: z.string().min(1, "Bắt buộc phải chọn báo giá"),
     total_value: z.coerce.number().min(0, "Giá trị không hợp lệ"),
     signed_date: z.string().optional().nullable(),
     notes: z.string().optional().nullable(),
@@ -44,10 +44,13 @@ export default function ContractModal({
 
     const isEditing = !!contract && !!contract.id;
 
+    const [quotes, setQuotes] = useState<any[]>([]);
+
     const {
         register,
         handleSubmit,
         setValue,
+        watch,
         reset,
         formState: { errors },
     } = useForm<ContractFormData>({
@@ -55,30 +58,58 @@ export default function ContractModal({
         defaultValues: {
             name: "",
             client_id: "",
+            quote_id: "",
             total_value: 0,
             signed_date: new Date().toISOString().split("T")[0],
             notes: "",
         },
     });
 
-    // Load clients and set form values
+    const selectedQuoteId = watch("quote_id");
+
+    // Load clients, quotes and set form values
     useEffect(() => {
-        async function loadClients() {
-            const { data } = await supabase
-                .from("partners")
-                .select("*")
-                .eq("type", "Client")
-                .order("name");
-            if (data) setClients(data as Partner[]);
+        async function loadData() {
+            const [clientsRes, quotesRes] = await Promise.all([
+                supabase
+                    .from("partners")
+                    .select("*")
+                    .eq("type", "Client")
+                    .order("name"),
+                supabase
+                    .from("quotes")
+                    .select("id, total_amount, client_id, status")
+                    .order("created_at", { ascending: false })
+            ]);
+            if (clientsRes.data) setClients(clientsRes.data as Partner[]);
+            if (quotesRes.data) setQuotes(quotesRes.data);
         }
-        loadClients();
+        loadData();
     }, []);
+
+    // Auto-fill form on quote selection
+    useEffect(() => {
+        if (selectedQuoteId && !isEditing) {
+            const quote = quotes.find(q => q.id === selectedQuoteId);
+            if (quote) {
+                setValue("client_id", quote.client_id || "");
+                setValue("total_value", quote.total_amount || 0);
+                if (!watch("name")) {
+                    const client = clients.find(c => c.id === quote.client_id);
+                    if (client) {
+                        setValue("name", `Hợp đồng ${client.name} - Báo giá #${quote.id.substring(0, 6)}`);
+                    }
+                }
+            }
+        }
+    }, [selectedQuoteId, quotes, clients, isEditing, setValue, watch]);
 
     useEffect(() => {
         if (isOpen) {
             if (contract) {
                 setValue("name", contract.name);
                 setValue("client_id", contract.client_id);
+                setValue("quote_id", contract.quote_id || "");
                 setValue("total_value", contract.total_value);
                 setValue(
                     "signed_date",
@@ -89,6 +120,7 @@ export default function ContractModal({
                 reset({
                     name: "",
                     client_id: "",
+                    quote_id: "",
                     total_value: 0,
                     signed_date: new Date().toISOString().split("T")[0],
                     notes: "",
@@ -105,6 +137,7 @@ export default function ContractModal({
         const payload = {
             name: data.name,
             client_id: data.client_id,
+            quote_id: data.quote_id,
             total_value: data.total_value,
             signed_date: data.signed_date || null,
             notes: data.notes || null,
@@ -169,16 +202,42 @@ export default function ContractModal({
                         {errors.name && <p className="error-text">{errors.name.message}</p>}
                     </div>
 
+                    {/* Báo giá */}
+                    <div>
+                        <label className="label">
+                            Chọn Báo giá <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                            className={`select ${errors.quote_id ? "input-error" : ""}`}
+                            {...register("quote_id")}
+                            disabled={isEditing}
+                        >
+                            <option value="">Chọn báo giá</option>
+                            {quotes.map((q) => {
+                                const client = clients.find(c => c.id === q.client_id);
+                                return (
+                                    <option key={q.id} value={q.id}>
+                                        Báo giá #{q.id.substring(0, 6)} - {client?.name || "Khách hàng"} - {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(q.total_amount)}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                        {errors.quote_id && (
+                            <p className="error-text">{errors.quote_id.message}</p>
+                        )}
+                    </div>
+
                     {/* Khách hàng */}
                     <div>
                         <label className="label">
                             Khách hàng <span className="text-red-500">*</span>
                         </label>
                         <select
-                            className={`select ${errors.client_id ? "input-error" : ""}`}
+                            className={`select bg-slate-50 opacity-70 ${errors.client_id ? "input-error" : ""}`}
                             {...register("client_id")}
+                            disabled
                         >
-                            <option value="">Chọn khách hàng</option>
+                            <option value="">Khách hàng sẽ tự động chọn theo báo giá</option>
                             {clients.map((c) => (
                                 <option key={c.id} value={c.id}>
                                     {c.name}
