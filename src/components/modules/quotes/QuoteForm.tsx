@@ -26,6 +26,7 @@ interface QuoteItemRow {
     unit_price: number;
     discount: number;
     line_total: number;
+    is_custom?: boolean;
 }
 
 interface QuoteFormProps {
@@ -100,6 +101,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                                 unit_price: qi.unit_price as number,
                                 discount: qi.discount as number,
                                 line_total: qi.line_total as number,
+                                is_custom: !qi.service_id,
                             }))
                         );
                     }
@@ -155,6 +157,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                 unit_price: 0,
                 discount: 0,
                 line_total: 0,
+                is_custom: false,
             },
         ]);
     }
@@ -163,12 +166,17 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
         setItems((prev) => prev.filter((_, i) => i !== index));
     }
 
-    function updateItem(index: number, field: keyof QuoteItemRow, value: string | number) {
+    function updateItem(index: number, field: keyof QuoteItemRow, value: any) {
         setItems((prev) => {
             const updated = [...prev];
             const item = { ...updated[index] };
 
-            if (field === "service_id") {
+            if (field === "is_custom") {
+                item.is_custom = value as boolean;
+                if (value) {
+                    item.service_id = "";
+                }
+            } else if (field === "service_id") {
                 item.service_id = value as string;
                 // Auto-fill price & clear custom fields from service
                 const svc = services.find((s) => s.id === value);
@@ -440,7 +448,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                             const selectedService = services.find(
                                 (s) => s.id === item.service_id
                             );
-                            const isCustom = !item.service_id;
+                            const isCustom = item.is_custom ?? (!item.service_id && !!item.custom_name);
                             return (
                                 <div key={index} className="p-4">
                                     <div className="flex items-start gap-2">
@@ -451,7 +459,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                                                     type="button"
                                                     onClick={() => {
                                                         if (isCustom) return;
-                                                        updateItem(index, "service_id", "");
+                                                        updateItem(index, "is_custom", true);
                                                     }}
                                                     className={`text-xs px-2.5 py-1 rounded-full transition-colors ${isCustom ? "bg-primary-100 text-primary-700 font-medium" : "text-slate-500 hover:text-slate-700"}`}
                                                 >
@@ -461,7 +469,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                                                     type="button"
                                                     onClick={() => {
                                                         if (!isCustom) return;
-                                                        // switch to dropdown — don't change service_id
+                                                        updateItem(index, "is_custom", false);
                                                     }}
                                                     className={`text-xs px-2.5 py-1 rounded-full transition-colors ${!isCustom ? "bg-primary-100 text-primary-700 font-medium" : "text-slate-500 hover:text-slate-700"}`}
                                                 >
