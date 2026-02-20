@@ -45,6 +45,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
     const [services, setServices] = useState<Service[]>([]);
 
     const [clientId, setClientId] = useState("");
+    const [contractId, setContractId] = useState<string | null>(null);
     const [status, setStatus] = useState<"Draft" | "Sent" | "Approved">("Draft");
     const [notes, setNotes] = useState("");
     const [vatRate, setVatRate] = useState<number>(0);
@@ -105,6 +106,19 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                             }))
                         );
                     }
+                }
+                setLoading(false);
+            } else {
+                // If not editing, check for URL parameters (e.g. from Add-on Quote flow)
+                const params = new URLSearchParams(window.location.search);
+                const urlClientId = params.get("clientId");
+                const urlContractId = params.get("contractId");
+
+                if (urlClientId) {
+                    setClientId(urlClientId);
+                }
+                if (urlContractId) {
+                    setContractId(urlContractId);
                 }
                 setLoading(false);
             }
@@ -302,6 +316,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                 .from("quotes")
                 .insert({
                     client_id: clientId,
+                    contract_id: contractId,
                     total_amount: grandTotal,
                     vat_rate: vatRate,
                     status: finalStatus,
@@ -387,6 +402,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                             value={clientId}
                             onChange={(e) => setClientId(e.target.value)}
                             className="select"
+                            disabled={!!contractId || isEditing}
                         >
                             <option value="">Chọn khách hàng</option>
                             {clients.map((c) => (

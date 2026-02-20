@@ -75,7 +75,8 @@ export default function ContractDetail() {
     const [deletingPayment, setDeletingPayment] = useState(false);
 
     // Quote Details state
-    const [quoteItems, setQuoteItems] = useState<QuoteItemRow[]>([]);
+    const [baseQuoteItems, setBaseQuoteItems] = useState<QuoteItemRow[]>([]);
+    const [addonQuotes, setAddonQuotes] = useState<{ id: string, total_amount: number, vat_rate: number, items: QuoteItemRow[] }[]>([]);
     const [loadingQuoteDetails, setLoadingQuoteDetails] = useState(false);
     const [quoteVatRate, setQuoteVatRate] = useState<number>(0);
     const [quoteSubtotal, setQuoteSubtotal] = useState<number>(0);
@@ -141,37 +142,83 @@ export default function ContractDetail() {
 
     // Fetch Quote Details
     const fetchQuoteDetails = useCallback(async () => {
-        if (!contract?.quote_id) return;
+        if (!contract) return;
         setLoadingQuoteDetails(true);
 
-        const { data: quote } = await supabase
-            .from("quotes")
-            .select("total_amount, vat_rate")
-            .eq("id", contract.quote_id)
-            .single();
+        try {
+            // 1. Fetch Base Quote if exists
+            if (contract.quote_id) {
+                const { data: quote } = await supabase
+                    .from("quotes")
+                    .select("total_amount, vat_rate")
+                    .eq("id", contract.quote_id)
+                    .single();
 
-        if (quote) {
-            setQuoteVatRate(quote.vat_rate || 0);
+                if (quote) {
+                    setQuoteVatRate(quote.vat_rate || 0);
+                }
+
+                const { data: items } = await supabase
+                    .from("quote_items")
+                    .select("*, service:services!service_id(name, unit)")
+                    .eq("quote_id", contract.quote_id)
+                    .order("created_at", { ascending: true });
+
+                if (items) {
+                    const fixedData = items.map((item: any) => ({
+                        ...item,
+                        service: Array.isArray(item.service) ? item.service[0] : item.service,
+                    }));
+                    setBaseQuoteItems(fixedData as QuoteItemRow[]);
+
+                    const subtotal = fixedData.reduce((sum, item) => sum + item.line_total, 0);
+                    setQuoteSubtotal(subtotal);
+                }
+            } else {
+                setBaseQuoteItems([]);
+                setQuoteSubtotal(0);
+                setQuoteVatRate(0);
+            }
+
+            // 2. Fetch Add-on Quotes associated with this contract_id
+            const { data: addons } = await supabase
+                .from("quotes")
+                .select("id, total_amount, vat_rate")
+                .eq("contract_id", contract.id)
+                .order("created_at", { ascending: true });
+
+            if (addons && addons.length > 0) {
+                const addonQuoteIds = addons.map(a => a.id);
+                const { data: addonItems } = await supabase
+                    .from("quote_items")
+                    .select("*, service:services!service_id(name, unit)")
+                    .in("quote_id", addonQuoteIds)
+                    .order("created_at", { ascending: true });
+
+                const groupedAddons = addons.map(addon => {
+                    const itemsForAddon = addonItems ? addonItems.filter(item => item.quote_id === addon.id).map((item: any) => ({
+                        ...item,
+                        service: Array.isArray(item.service) ? item.service[0] : item.service,
+                    })) : [];
+
+                    return {
+                        id: addon.id,
+                        total_amount: addon.total_amount,
+                        vat_rate: addon.vat_rate || 0,
+                        items: itemsForAddon as QuoteItemRow[]
+                    };
+                });
+
+                setAddonQuotes(groupedAddons);
+            } else {
+                setAddonQuotes([]);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoadingQuoteDetails(false);
         }
-
-        const { data: items } = await supabase
-            .from("quote_items")
-            .select("*, service:services!service_id(name, unit)")
-            .eq("quote_id", contract.quote_id)
-            .order("created_at", { ascending: true });
-
-        if (items) {
-            const fixedData = items.map((item: any) => ({
-                ...item,
-                service: Array.isArray(item.service) ? item.service[0] : item.service,
-            }));
-            setQuoteItems(fixedData as QuoteItemRow[]);
-
-            const subtotal = fixedData.reduce((sum, item) => sum + item.line_total, 0);
-            setQuoteSubtotal(subtotal);
-        }
-        setLoadingQuoteDetails(false);
-    }, [contract?.quote_id, supabase]);
+    }, [contract, supabase]);
 
     // Fetch Payments
     const fetchPayments = useCallback(async () => {
@@ -737,83 +784,187 @@ export default function ContractDetail() {
             {/* Quote Details Tab */}
             {activeTab === "quote_details" && (
                 <div className="animate-fade-in card overflow-hidden">
-                    <div className="p-4 border-b border-slate-200">
-                        <h3 className="text-lg font-semibold text-slate-900">Chi tiết hợp đồng</h3>
-                        {!contract.quote_id && (
-                            <p className="text-sm text-amber-600 mt-1">Hợp đồng này không được tạo từ báo giá nào.</p>
-                        )}
+                    <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-900">Chi tiết hợp đồng</h3>
+                            {!contract.quote_id && addonQuotes.length === 0 && (
+                                <p className="text-sm text-amber-600 mt-1">Hợp đồng này không có báo giá nào.</p>
+                            )}
+                        </div>
+                        <Link
+                            href={`/quotes/new?contractId=${contractId}&clientId=${contract.client_id}`}
+                            className="btn-primary py-2 px-3 text-sm h-auto w-fit"
+                        >
+                            Tạo báo giá phát sinh
+                        </Link>
                     </div>
-                    {contract.quote_id && (
-                        <>
-                            {loadingQuoteDetails ? (
-                                <div className="flex justify-center py-12">
-                                    <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                                </div>
-                            ) : quoteItems.length === 0 ? (
-                                <div className="p-8 text-center text-slate-500">
-                                    Báo giá này không có hạng mục nào.
-                                </div>
-                            ) : (
-                                <div>
-                                    {/* Desktop Table (for quote items) */}
-                                    <div className="overflow-x-auto">
-                                        <table className="table min-w-full">
-                                            <thead>
-                                                <tr>
-                                                    <th className="w-12 text-center">STT</th>
-                                                    <th>Hạng mục / Dịch vụ</th>
-                                                    <th className="text-center">ĐVT</th>
-                                                    <th className="text-right">Số lượng</th>
-                                                    <th className="text-right">Đơn giá</th>
-                                                    <th className="text-right">CK (%)</th>
-                                                    <th className="text-right">Thành tiền</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {quoteItems.map((item, index) => {
-                                                    const name = item.custom_name || item.service?.name || "—";
-                                                    const unit = item.custom_unit || item.service?.unit || "—";
-                                                    return (
-                                                        <tr key={item.id}>
-                                                            <td className="text-center text-slate-500">{index + 1}</td>
-                                                            <td>
-                                                                <div className="font-medium text-slate-900">{name}</div>
-                                                                {item.description && (
-                                                                    <div className="text-xs text-slate-500 mt-1 line-clamp-2" title={item.description}>
-                                                                        {item.description}
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            <td className="text-center">{unit}</td>
-                                                            <td className="text-right">{item.quantity}</td>
-                                                            <td className="text-right">{formatCurrency(item.unit_price)}</td>
-                                                            <td className="text-right">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
-                                                            <td className="text-right font-medium text-primary-600">{formatCurrency(item.line_total)}</td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
+
+                    {loadingQuoteDetails ? (
+                        <div className="flex justify-center py-12">
+                            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-6 p-4">
+                            {/* Base Quote Section */}
+                            {contract.quote_id && (
+                                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                    <div className="bg-slate-50 p-3 border-b border-slate-200">
+                                        <h4 className="font-semibold text-slate-800">Báo giá gốc</h4>
                                     </div>
-                                    <div className="p-4 bg-slate-50 border-t border-slate-200">
-                                        <div className="space-y-2 max-w-sm ml-auto">
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-slate-500">Tạm tính:</span>
-                                                <span className="font-medium">{formatCurrency(quoteSubtotal)}</span>
+                                    {baseQuoteItems.length === 0 ? (
+                                        <div className="p-6 text-center text-slate-500">
+                                            Báo giá này không có hạng mục nào.
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="overflow-x-auto">
+                                                <table className="table min-w-full">
+                                                    <thead>
+                                                        <tr>
+                                                            <th className="w-12 text-center">STT</th>
+                                                            <th>Hạng mục / Dịch vụ</th>
+                                                            <th className="text-center">ĐVT</th>
+                                                            <th className="text-right">Số lượng</th>
+                                                            <th className="text-right">Đơn giá</th>
+                                                            <th className="text-right">CK (%)</th>
+                                                            <th className="text-right">Thành tiền</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {baseQuoteItems.map((item, index) => {
+                                                            const name = item.custom_name || item.service?.name || "—";
+                                                            const unit = item.custom_unit || item.service?.unit || "—";
+                                                            return (
+                                                                <tr key={item.id}>
+                                                                    <td className="text-center text-slate-500">{index + 1}</td>
+                                                                    <td>
+                                                                        <div className="font-medium text-slate-900">{name}</div>
+                                                                        {item.description && (
+                                                                            <div className="text-xs text-slate-500 mt-1 line-clamp-2" title={item.description}>
+                                                                                {item.description}
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="text-center">{unit}</td>
+                                                                    <td className="text-right">{item.quantity}</td>
+                                                                    <td className="text-right">{formatCurrency(item.unit_price)}</td>
+                                                                    <td className="text-right">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
+                                                                    <td className="text-right font-medium text-primary-600">{formatCurrency(item.line_total)}</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
                                             </div>
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-slate-500">Thuế VAT ({quoteVatRate}%):</span>
-                                                <span className="font-medium">{formatCurrency(quoteSubtotal * (quoteVatRate / 100))}</span>
-                                            </div>
-                                            <div className="flex justify-between font-bold text-lg pt-2 border-t border-slate-200">
-                                                <span className="text-slate-700">Tổng cộng:</span>
-                                                <span className="text-primary-600">{formatCurrency(quoteSubtotal * (1 + quoteVatRate / 100))}</span>
+                                            <div className="p-4 bg-slate-50 border-t border-slate-200">
+                                                <div className="space-y-2 max-w-sm ml-auto">
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-slate-500">Tạm tính:</span>
+                                                        <span className="font-medium">{formatCurrency(quoteSubtotal)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-slate-500">Thuế VAT ({quoteVatRate}%):</span>
+                                                        <span className="font-medium">{formatCurrency(quoteSubtotal * (quoteVatRate / 100))}</span>
+                                                    </div>
+                                                    <div className="flex justify-between font-bold text-lg pt-2 border-t border-slate-200">
+                                                        <span className="text-slate-700">Tổng cộng:</span>
+                                                        <span className="text-primary-600">{formatCurrency(quoteSubtotal * (1 + quoteVatRate / 100))}</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
-                        </>
+
+                            {/* Add-on Quotes Section */}
+                            {addonQuotes.map((addon, aIndex) => (
+                                <div key={addon.id} className="border border-indigo-200 rounded-lg overflow-hidden">
+                                    <div className="bg-indigo-50 p-3 border-b border-indigo-200 flex justify-between items-center">
+                                        <h4 className="font-semibold text-indigo-800">
+                                            Báo giá phát sinh #{aIndex + 1}
+                                        </h4>
+                                        <Link
+                                            href={`/quotes/${addon.id}`}
+                                            className="text-sm text-indigo-600 hover:text-indigo-800 underline"
+                                        >
+                                            Chi tiết báo giá
+                                        </Link>
+                                    </div>
+                                    {addon.items.length === 0 ? (
+                                        <div className="p-6 text-center text-slate-500">
+                                            Báo giá phát sinh này không có hạng mục nào.
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="overflow-x-auto">
+                                                <table className="table min-w-full">
+                                                    <thead>
+                                                        <tr className="bg-slate-50">
+                                                            <th className="w-12 text-center text-slate-500">STT</th>
+                                                            <th className="text-slate-500">Hạng mục / Dịch vụ</th>
+                                                            <th className="text-center text-slate-500">ĐVT</th>
+                                                            <th className="text-right text-slate-500">Số lượng</th>
+                                                            <th className="text-right text-slate-500">Đơn giá</th>
+                                                            <th className="text-right text-slate-500">CK (%)</th>
+                                                            <th className="text-right text-slate-500">Thành tiền</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {addon.items.map((item, index) => {
+                                                            const name = item.custom_name || item.service?.name || "—";
+                                                            const unit = item.custom_unit || item.service?.unit || "—";
+                                                            return (
+                                                                <tr key={item.id}>
+                                                                    <td className="text-center text-slate-500">{index + 1}</td>
+                                                                    <td>
+                                                                        <div className="font-medium text-slate-900">{name}</div>
+                                                                        {item.description && (
+                                                                            <div className="text-xs text-slate-500 mt-1 line-clamp-2" title={item.description}>
+                                                                                {item.description}
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="text-center">{unit}</td>
+                                                                    <td className="text-right">{item.quantity}</td>
+                                                                    <td className="text-right">{formatCurrency(item.unit_price)}</td>
+                                                                    <td className="text-right">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
+                                                                    <td className="text-right font-medium text-primary-600">{formatCurrency(item.line_total)}</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div className="p-4 bg-indigo-50/30 border-t border-indigo-100">
+                                                <div className="space-y-2 max-w-sm ml-auto">
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-slate-500">Tạm tính:</span>
+                                                        <span className="font-medium">
+                                                            {formatCurrency(
+                                                                addon.items.reduce((sum, item) => sum + item.line_total, 0)
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-slate-500">Thuế VAT ({addon.vat_rate}%):</span>
+                                                        <span className="font-medium">
+                                                            {formatCurrency(
+                                                                addon.items.reduce((sum, item) => sum + item.line_total, 0) * (addon.vat_rate / 100)
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between font-bold text-lg pt-2 border-t border-indigo-200">
+                                                        <span className="text-slate-700">Tổng cộng:</span>
+                                                        <span className="text-primary-600">{formatCurrency(addon.total_amount)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </div>
             )}

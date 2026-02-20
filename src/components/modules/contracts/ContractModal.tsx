@@ -70,22 +70,48 @@ export default function ContractModal({
     // Load clients, quotes and set form values
     useEffect(() => {
         async function loadData() {
-            const [clientsRes, quotesRes] = await Promise.all([
-                supabase
-                    .from("partners")
-                    .select("*")
-                    .eq("type", "Client")
-                    .order("name"),
-                supabase
-                    .from("quotes")
-                    .select("id, total_amount, client_id, status")
-                    .order("created_at", { ascending: false })
-            ]);
-            if (clientsRes.data) setClients(clientsRes.data as Partner[]);
-            if (quotesRes.data) setQuotes(quotesRes.data);
+            // First load clients
+            const { data: clientsRes } = await supabase
+                .from("partners")
+                .select("*")
+                .eq("type", "Client")
+                .order("name");
+
+            if (clientsRes) setClients(clientsRes as Partner[]);
+
+            // Then load quotes that are NOT already linked to a contract
+            // We can do this efficiently by fetching all quote IDs from contracts
+            const { data: contractQuotes } = await supabase
+                .from("contracts")
+                .select("quote_id")
+                .not("quote_id", "is", null);
+
+            const usedQuoteIds = contractQuotes?.map(c => c.quote_id) || [];
+
+            let query = supabase
+                .from("quotes")
+                .select("id, total_amount, client_id, status")
+                .order("created_at", { ascending: false });
+
+            // Only fetch unused quotes, unless we're editing an existing contract
+            // in which case we also need to include its currently selected quote
+            if (usedQuoteIds.length > 0) {
+                if (isEditing && contract?.quote_id) {
+                    // Filter out used quotes except the one for this contract
+                    const filterIds = usedQuoteIds.filter(id => id !== contract.quote_id);
+                    if (filterIds.length > 0) {
+                        query = query.not("id", "in", `(${filterIds.join(',')})`);
+                    }
+                } else {
+                    query = query.not("id", "in", `(${usedQuoteIds.join(',')})`);
+                }
+            }
+
+            const { data: quotesRes } = await query;
+            if (quotesRes) setQuotes(quotesRes);
         }
         loadData();
-    }, []);
+    }, [isEditing, contract?.quote_id, supabase]);
 
     // Auto-fill form on quote selection
     useEffect(() => {

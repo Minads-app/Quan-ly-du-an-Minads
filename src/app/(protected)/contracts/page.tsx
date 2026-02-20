@@ -209,15 +209,15 @@ function ContractsContent() {
                                         </button>
                                     </div>
                                 </div>
-                                <div className="text-sm text-slate-600 mb-2">
+                                <div className="text-sm text-slate-600 mb-2 truncate">
                                     {contract.client?.name}
                                 </div>
                                 <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                                    <div className="flex items-center text-xs text-slate-500 gap-1">
-                                        <Calendar className="w-3.5 h-3.5" />
-                                        {formatDate(contract.signed_date)}
+                                    <div className="flex items-center text-xs text-slate-500 gap-1 min-w-0 pr-2">
+                                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                                        <span className="truncate">{formatDate(contract.signed_date)}</span>
                                     </div>
-                                    <div className="font-bold text-primary-600">
+                                    <div className="font-bold text-primary-600 shrink-0">
                                         {formatCurrency(contract.total_value)}
                                     </div>
                                 </div>
@@ -277,7 +277,8 @@ function ContractsContent() {
                         </table>
                     </div>
                 </>
-            )}
+            )
+            }
 
             <ContractModal
                 contract={editingContract}
@@ -286,16 +287,18 @@ function ContractsContent() {
                 onSaved={fetchContracts}
             />
 
-            {deleteContract && (
-                <DeleteConfirm
-                    title="Xóa hợp đồng"
-                    message={`Bạn có chắc muốn xóa hợp đồng "${deleteContract.name}"?`}
-                    loading={deleting}
-                    onConfirm={handleDelete}
-                    onCancel={() => setDeleteContract(null)}
-                />
-            )}
-        </div>
+            {
+                deleteContract && (
+                    <DeleteConfirm
+                        title="Xóa hợp đồng"
+                        message={`Bạn có chắc muốn xóa hợp đồng "${deleteContract.name}"?`}
+                        loading={deleting}
+                        onConfirm={handleDelete}
+                        onCancel={() => setDeleteContract(null)}
+                    />
+                )
+            }
+        </div >
     );
 }
 

@@ -47,6 +47,7 @@ export interface Service {
 export interface Quote {
     id: string;
     client_id: string;
+    contract_id?: string | null;
     total_amount: number;
     status: QuoteStatus;
     notes: string | null;
