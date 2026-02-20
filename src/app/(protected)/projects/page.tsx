@@ -100,6 +100,103 @@ export default function ProjectsPage() {
         setIsModalOpen(true);
     }
 
+    // ---- Date & Progress helpers ----
+
+    function formatDate(dateStr: string | null) {
+        if (!dateStr) return "—";
+        return new Date(dateStr).toLocaleDateString("vi-VN", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+        });
+    }
+
+    function getTimeProgress(startDate: string | null, endDate: string | null, status: ProjectStatus) {
+        if (status === "COMPLETED") return { percent: 100, label: "Hoàn thành" };
+        if (status === "CANCELLED") return { percent: 0, label: "Đã hủy" };
+        if (status === "NOT_STARTED") return { percent: 0, label: "Chưa bắt đầu" };
+        if (!startDate || !endDate) return { percent: 0, label: "Chưa có lịch" };
+
+        const now = new Date().getTime();
+        const start = new Date(startDate).getTime();
+        const end = new Date(endDate).getTime();
+        const total = end - start;
+
+        if (total <= 0) return { percent: 100, label: "—" };
+
+        const elapsed = now - start;
+        const percent = Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
+        return { percent, label: `${percent}%` };
+    }
+
+    function getDeadlineWarning(endDate: string | null, status: ProjectStatus) {
+        if (!endDate || status === "COMPLETED" || status === "CANCELLED" || status === "NOT_STARTED") return null;
+
+        const now = new Date();
+        const end = new Date(endDate);
+        const diffMs = end.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) {
+            return { type: "overdue" as const, text: `Trễ ${Math.abs(diffDays)} ngày`, color: "bg-red-100 text-red-700" };
+        } else if (diffDays <= 3) {
+            return { type: "urgent" as const, text: `Còn ${diffDays} ngày`, color: "bg-orange-100 text-orange-700" };
+        } else if (diffDays <= 7) {
+            return { type: "warning" as const, text: `Còn ${diffDays} ngày`, color: "bg-amber-100 text-amber-700" };
+        }
+        return null;
+    }
+
+    function getProgressBarColor(percent: number, status: ProjectStatus, endDate: string | null) {
+        if (status === "COMPLETED") return "bg-green-500";
+        if (status === "CANCELLED") return "bg-slate-400";
+        if (status === "ON_HOLD") return "bg-orange-400";
+
+        // Check if overdue
+        if (endDate) {
+            const now = new Date();
+            const end = new Date(endDate);
+            if (now > end) return "bg-red-500";
+        }
+
+        if (percent >= 80) return "bg-amber-500";
+        return "bg-blue-500";
+    }
+
+    function ProgressBar({ project }: { project: ProjectRow }) {
+        const { percent, label } = getTimeProgress(project.start_date, project.end_date, project.status);
+        const warning = getDeadlineWarning(project.end_date, project.status);
+        const barColor = getProgressBarColor(percent, project.status, project.end_date);
+
+        return (
+            <div className="space-y-1.5 min-w-[160px]">
+                {/* Date range */}
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>{formatDate(project.start_date)}</span>
+                    <span>{formatDate(project.end_date)}</span>
+                </div>
+                {/* Bar */}
+                <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                        className={`absolute left-0 top-0 h-full rounded-full transition-all duration-500 ${barColor}`}
+                        style={{ width: `${percent}%` }}
+                    />
+                </div>
+                {/* Label + Warning */}
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-500 font-medium">{label}</span>
+                    {warning && (
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${warning.color}`}>
+                            {warning.text}
+                        </span>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    // ---- Status & Type helpers ----
+
     function getStatusBadge(status: ProjectStatus) {
         switch (status) {
             case "NOT_STARTED":
@@ -214,6 +311,10 @@ export default function ProjectsPage() {
                                 <div className="mt-2 text-sm text-slate-600">
                                     <p>Phụ trách: <strong>{project.assignee?.full_name || "—"}</strong></p>
                                 </div>
+                                {/* Progress Bar on mobile */}
+                                <div className="mt-3 pt-3 border-t border-slate-100">
+                                    <ProgressBar project={project} />
+                                </div>
                                 <div className="mt-2 pt-2 border-t border-slate-100 flex justify-end gap-2">
                                     <button
                                         onClick={() => handleEdit(project)}
@@ -241,6 +342,7 @@ export default function ProjectsPage() {
                                     <th>Tên dự án</th>
                                     <th>Hợp đồng / Khách hàng</th>
                                     <th>Trạng thái</th>
+                                    <th>Tiến độ</th>
                                     <th>Người phụ trách</th>
                                     <th className="text-right w-24">Thao tác</th>
                                 </tr>
@@ -261,6 +363,9 @@ export default function ProjectsPage() {
                                             </div>
                                         </td>
                                         <td>{getStatusBadge(project.status)}</td>
+                                        <td>
+                                            <ProgressBar project={project} />
+                                        </td>
                                         <td className="font-medium text-slate-900">
                                             {project.assignee?.full_name || "—"}
                                         </td>

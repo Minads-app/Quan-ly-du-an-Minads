@@ -189,8 +189,8 @@ export default function DebtsPage() {
                     <button
                         onClick={() => setActiveTab("RECEIVABLE")}
                         className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === "RECEIVABLE"
-                                ? "bg-white text-primary-700 shadow-sm"
-                                : "text-slate-600 hover:text-slate-900"
+                            ? "bg-white text-primary-700 shadow-sm"
+                            : "text-slate-600 hover:text-slate-900"
                             }`}
                     >
                         Phải thu (Khách hàng)
@@ -198,8 +198,8 @@ export default function DebtsPage() {
                     <button
                         onClick={() => setActiveTab("PAYABLE")}
                         className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === "PAYABLE"
-                                ? "bg-white text-primary-700 shadow-sm"
-                                : "text-slate-600 hover:text-slate-900"
+                            ? "bg-white text-primary-700 shadow-sm"
+                            : "text-slate-600 hover:text-slate-900"
                             }`}
                     >
                         Phải trả (Nhà cung cấp)
@@ -252,7 +252,14 @@ export default function DebtsPage() {
 
                                     return (
                                         <tr key={debt.id}>
-                                            <td className="font-medium">{debt.partner?.name}</td>
+                                            <td className="font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    {debt.partner?.name}
+                                                    {(debt as any).contract_cost_id && (
+                                                        <span className="badge bg-emerald-50 text-emerald-600 text-[10px]">Từ HĐ</span>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="text-right">{formatCurrency(debt.total_amount)}</td>
                                             <td className="text-right text-green-600">
                                                 {formatCurrency(debt.paid_amount)}

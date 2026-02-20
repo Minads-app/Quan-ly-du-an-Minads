@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
     Plus,
@@ -187,9 +188,12 @@ function ContractsContent() {
                         {contracts.map((contract) => (
                             <div key={contract.id} className="card p-4">
                                 <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-semibold text-slate-900 line-clamp-2">
+                                    <Link
+                                        href={`/contracts/${contract.id}`}
+                                        className="font-semibold text-slate-900 line-clamp-2 hover:text-primary-600 transition-colors"
+                                    >
                                         {contract.name}
-                                    </h3>
+                                    </Link>
                                     <div className="flex gap-1 ml-2">
                                         <button
                                             onClick={() => handleEdit(contract)}
@@ -237,7 +241,12 @@ function ContractsContent() {
                                 {contracts.map((contract) => (
                                     <tr key={contract.id}>
                                         <td className="font-medium text-slate-900">
-                                            {contract.name}
+                                            <Link
+                                                href={`/contracts/${contract.id}`}
+                                                className="hover:text-primary-600 transition-colors"
+                                            >
+                                                {contract.name}
+                                            </Link>
                                         </td>
                                         <td>{contract.client?.name || "—"}</td>
                                         <td>{formatDate(contract.signed_date)}</td>

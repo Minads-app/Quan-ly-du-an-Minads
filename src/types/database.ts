@@ -101,6 +101,16 @@ export interface ProjectCost {
     created_at: string;
 }
 
+export interface ContractCost {
+    id: string;
+    contract_id: string;
+    supplier_id: string | null;
+    cost_category: string;
+    amount: number;
+    description: string | null;
+    created_at: string;
+}
+
 export interface Debt {
     id: string;
     partner_id: string;
@@ -109,6 +119,7 @@ export interface Debt {
     paid_amount: number;
     due_date: string | null;
     notes: string | null;
+    contract_cost_id: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -123,6 +134,7 @@ export type QuoteItemInsert = Omit<QuoteItem, "id" | "created_at">;
 export type ContractInsert = Omit<Contract, "id" | "created_at" | "updated_at">;
 export type ProjectInsert = Omit<Project, "id" | "created_at" | "updated_at">;
 export type ProjectCostInsert = Omit<ProjectCost, "id" | "created_at">;
+export type ContractCostInsert = Omit<ContractCost, "id" | "created_at">;
 export type DebtInsert = Omit<Debt, "id" | "created_at" | "updated_at">;
 
 // ---- Update types ----
@@ -135,6 +147,7 @@ export type QuoteItemUpdate = Partial<QuoteItemInsert>;
 export type ContractUpdate = Partial<ContractInsert>;
 export type ProjectUpdate = Partial<ProjectInsert>;
 export type ProjectCostUpdate = Partial<ProjectCostInsert>;
+export type ContractCostUpdate = Partial<ContractCostInsert>;
 export type DebtUpdate = Partial<DebtInsert>;
 
 // ---- Database type cho Supabase client ----
@@ -188,6 +201,12 @@ export interface Database {
                 Row: ProjectCost;
                 Insert: ProjectCostInsert;
                 Update: ProjectCostUpdate;
+                Relationships: [];
+            };
+            contract_costs: {
+                Row: ContractCost;
+                Insert: ContractCostInsert;
+                Update: ContractCostUpdate;
                 Relationships: [];
             };
             debts: {
