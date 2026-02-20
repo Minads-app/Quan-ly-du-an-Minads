@@ -169,6 +169,7 @@ export default function DebtModal({
                             <select
                                 className="select"
                                 {...register("type")}
+                                disabled={!!debt?.contract_id || !!debt?.contract_cost_id}
                             >
                                 <option value="RECEIVABLE">Phải thu (Khách nợ)</option>
                                 <option value="PAYABLE">Phải trả (Nợ NCC)</option>
@@ -183,6 +184,7 @@ export default function DebtModal({
                             <select
                                 className={`select ${errors.partner_id ? "input-error" : ""}`}
                                 {...register("partner_id")}
+                                disabled={!!debt?.contract_id || !!debt?.contract_cost_id}
                             >
                                 <option value="">-- Chọn đối tác --</option>
                                 {partners
@@ -209,6 +211,7 @@ export default function DebtModal({
                                 min="0"
                                 className={`input ${errors.total_amount ? "input-error" : ""}`}
                                 {...register("total_amount")}
+                                disabled={!!debt?.contract_id || !!debt?.contract_cost_id}
                             />
                             {errors.total_amount && (
                                 <p className="error-text">{errors.total_amount.message}</p>

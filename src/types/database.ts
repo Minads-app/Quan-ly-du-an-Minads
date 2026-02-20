@@ -122,6 +122,7 @@ export interface Debt {
     due_date: string | null;
     notes: string | null;
     contract_cost_id: string | null;
+    contract_id?: string | null;
     created_at: string;
     updated_at: string;
 }

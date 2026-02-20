@@ -256,7 +256,10 @@ export default function DebtsPage() {
                                                 <div className="flex items-center gap-2">
                                                     {debt.partner?.name}
                                                     {(debt as any).contract_cost_id && (
-                                                        <span className="badge bg-emerald-50 text-emerald-600 text-[10px]">Từ HĐ</span>
+                                                        <span className="badge bg-emerald-50 text-emerald-600 text-[10px]">Từ CP Hợp đồng</span>
+                                                    )}
+                                                    {(debt as any).contract_id && (
+                                                        <span className="badge bg-blue-50 text-blue-600 text-[10px]">Từ Hợp đồng</span>
                                                     )}
                                                 </div>
                                             </td>
