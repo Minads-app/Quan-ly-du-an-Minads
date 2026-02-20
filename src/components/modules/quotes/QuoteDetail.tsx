@@ -28,6 +28,9 @@ interface QuoteItemData {
     unit_price: number;
     discount: number;
     line_total: number;
+    description: string | null;
+    custom_name: string | null;
+    custom_unit: string | null;
     service: { name: string; unit: string } | null;
 }
 
@@ -53,7 +56,7 @@ export default function QuoteDetail({ quoteId }: { quoteId: string }) {
             const { data: qi } = await supabase
                 .from("quote_items")
                 .select(
-                    "id, quantity, unit_price, discount, line_total, service:services!service_id(name, unit)"
+                    "id, quantity, unit_price, discount, line_total, description, custom_name, custom_unit, service:services!service_id(name, unit)"
                 )
                 .eq("quote_id", quoteId)
                 .order("created_at");
@@ -234,10 +237,13 @@ export default function QuoteDetail({ quoteId }: { quoteId: string }) {
                                 <tr key={item.id}>
                                     <td className="text-slate-400">{idx + 1}</td>
                                     <td className="font-medium text-slate-900">
-                                        {item.service?.name || "—"}
+                                        {item.service?.name || item.custom_name || "—"}
                                         <span className="text-xs text-slate-400 ml-1">
-                                            ({item.service?.unit})
+                                            ({item.service?.unit || item.custom_unit || "—"})
                                         </span>
+                                        {item.description && (
+                                            <p className="text-xs text-slate-500 mt-0.5 font-normal">{item.description}</p>
+                                        )}
                                     </td>
                                     <td className="text-right">{item.quantity}</td>
                                     <td className="text-right">

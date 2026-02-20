@@ -19,6 +19,9 @@ import ServiceModal from "@/components/modules/services/ServiceModal";
 interface QuoteItemRow {
     id?: string;
     service_id: string;
+    custom_name: string;
+    custom_unit: string;
+    description: string;
     quantity: number;
     unit_price: number;
     discount: number;
@@ -87,7 +90,10 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                         setItems(
                             qItems.map((qi: any) => ({
                                 id: qi.id as string,
-                                service_id: qi.service_id as string,
+                                service_id: (qi.service_id as string) || "",
+                                custom_name: (qi.custom_name as string) || "",
+                                custom_unit: (qi.custom_unit as string) || "",
+                                description: (qi.description as string) || "",
                                 quantity: qi.quantity as number,
                                 unit_price: qi.unit_price as number,
                                 discount: qi.discount as number,
@@ -140,6 +146,9 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
             ...prev,
             {
                 service_id: "",
+                custom_name: "",
+                custom_unit: "",
+                description: "",
                 quantity: 1,
                 unit_price: 0,
                 discount: 0,
@@ -159,11 +168,23 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
 
             if (field === "service_id") {
                 item.service_id = value as string;
-                // Auto-fill price from service
+                // Auto-fill price & clear custom fields from service
                 const svc = services.find((s) => s.id === value);
                 if (svc) {
                     item.unit_price = svc.default_price;
+                    item.custom_name = "";
+                    item.custom_unit = "";
                 }
+                if (!value) {
+                    // Switched to custom mode
+                    item.unit_price = 0;
+                }
+            } else if (field === "custom_name") {
+                item.custom_name = value as string;
+            } else if (field === "custom_unit") {
+                item.custom_unit = value as string;
+            } else if (field === "description") {
+                item.description = value as string;
             } else if (field === "quantity") {
                 item.quantity = Number(value) || 0;
             } else if (field === "unit_price") {
@@ -199,8 +220,8 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
             setError("Vui lòng thêm ít nhất 1 hạng mục");
             return;
         }
-        if (items.some((item) => !item.service_id)) {
-            setError("Vui lòng chọn dịch vụ cho tất cả hạng mục");
+        if (items.some((item) => !item.service_id && !item.custom_name.trim())) {
+            setError("Vui lòng chọn dịch vụ hoặc nhập tên hạng mục");
             return;
         }
 
@@ -243,7 +264,10 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
 
             const itemsData = items.map((item) => ({
                 quote_id: quoteId,
-                service_id: item.service_id,
+                service_id: item.service_id || null,
+                custom_name: item.custom_name || null,
+                custom_unit: item.custom_unit || null,
+                description: item.description || null,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
                 discount: item.discount,
@@ -281,7 +305,10 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
 
             const itemsData = items.map((item) => ({
                 quote_id: (newQuote as { id: string }).id,
-                service_id: item.service_id,
+                service_id: item.service_id || null,
+                custom_name: item.custom_name || null,
+                custom_unit: item.custom_unit || null,
+                description: item.description || null,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
                 discount: item.discount,
@@ -407,44 +434,112 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                             const selectedService = services.find(
                                 (s) => s.id === item.service_id
                             );
+                            const isCustom = !item.service_id;
                             return (
                                 <div key={index} className="p-4">
                                     <div className="flex items-start gap-2">
                                         <div className="flex-1 space-y-3">
-                                            {/* Service select */}
+                                            {/* Mode toggle */}
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (isCustom) return;
+                                                        updateItem(index, "service_id", "");
+                                                    }}
+                                                    className={`text-xs px-2.5 py-1 rounded-full transition-colors ${isCustom ? "bg-primary-100 text-primary-700 font-medium" : "text-slate-500 hover:text-slate-700"}`}
+                                                >
+                                                    Nhập tự do
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (!isCustom) return;
+                                                        // switch to dropdown — don't change service_id
+                                                    }}
+                                                    className={`text-xs px-2.5 py-1 rounded-full transition-colors ${!isCustom ? "bg-primary-100 text-primary-700 font-medium" : "text-slate-500 hover:text-slate-700"}`}
+                                                >
+                                                    Chọn dịch vụ
+                                                </button>
+                                            </div>
+
+                                            {/* Service select OR custom input */}
                                             <div>
-                                                <label className="label text-xs">Dịch vụ</label>
-                                                <div className="flex items-center gap-2">
-                                                    <select
-                                                        value={item.service_id}
-                                                        onChange={(e) =>
-                                                            updateItem(index, "service_id", e.target.value)
-                                                        }
-                                                        className="select text-sm flex-1"
-                                                    >
-                                                        <option value="">Chọn dịch vụ</option>
-                                                        {services.map((s) => (
-                                                            <option key={s.id} value={s.id}>
-                                                                {s.name} ({s.unit})
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openServiceModal(index)}
-                                                        className="flex-shrink-0 p-2.5 rounded-lg border border-dashed border-primary-400 text-primary-600 hover:bg-primary-50 transition-colors"
-                                                        title="Thêm dịch vụ mới"
-                                                    >
-                                                        <PlusCircle className="w-4 h-4" />
-                                                    </button>
-                                                </div>
+                                                <label className="label text-xs">
+                                                    {isCustom ? "Tên hạng mục" : "Dịch vụ"}
+                                                </label>
+                                                {isCustom ? (
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <div className="col-span-2">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Nhập tên hạng mục..."
+                                                                value={item.custom_name}
+                                                                onChange={(e) =>
+                                                                    updateItem(index, "custom_name", e.target.value)
+                                                                }
+                                                                className="input text-sm"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="ĐVT (m², bộ...)"
+                                                                value={item.custom_unit}
+                                                                onChange={(e) =>
+                                                                    updateItem(index, "custom_unit", e.target.value)
+                                                                }
+                                                                className="input text-sm"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <select
+                                                            value={item.service_id}
+                                                            onChange={(e) =>
+                                                                updateItem(index, "service_id", e.target.value)
+                                                            }
+                                                            className="select text-sm flex-1"
+                                                        >
+                                                            <option value="">Chọn dịch vụ</option>
+                                                            {services.map((s) => (
+                                                                <option key={s.id} value={s.id}>
+                                                                    {s.name} ({s.unit})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openServiceModal(index)}
+                                                            className="flex-shrink-0 p-2.5 rounded-lg border border-dashed border-primary-400 text-primary-600 hover:bg-primary-50 transition-colors"
+                                                            title="Thêm dịch vụ mới"
+                                                        >
+                                                            <PlusCircle className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Description / Ghi chú */}
+                                            <div>
+                                                <label className="label text-xs">Ghi chú / Diễn giải</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Diễn giải cụ thể cho hạng mục này..."
+                                                    value={item.description}
+                                                    onChange={(e) =>
+                                                        updateItem(index, "description", e.target.value)
+                                                    }
+                                                    className="input text-sm"
+                                                />
                                             </div>
 
                                             {/* Quantity, Price, Discount */}
                                             <div className="grid grid-cols-3 gap-2">
                                                 <div>
                                                     <label className="label text-xs">
-                                                        SL {selectedService ? `(${selectedService.unit})` : ""}
+                                                        SL {selectedService ? `(${selectedService.unit})` : item.custom_unit ? `(${item.custom_unit})` : ""}
                                                     </label>
                                                     <input
                                                         type="number"

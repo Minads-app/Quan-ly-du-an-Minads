@@ -21,6 +21,9 @@ interface QuoteItemData {
     unit_price: number;
     discount: number;
     line_total: number;
+    description: string | null;
+    custom_name: string | null;
+    custom_unit: string | null;
     service: { name: string; unit: string } | null;
 }
 
@@ -61,7 +64,7 @@ export default function QuotePDF({ quoteId }: { quoteId: string }) {
                 const { data: qi } = await supabase
                     .from("quote_items")
                     .select(
-                        "id, quantity, unit_price, discount, line_total, service:services!service_id(name, unit)"
+                        "id, quantity, unit_price, discount, line_total, description, custom_name, custom_unit, service:services!service_id(name, unit)"
                     )
                     .eq("quote_id", quoteId)
                     .order("created_at");
@@ -230,10 +233,12 @@ export default function QuotePDF({ quoteId }: { quoteId: string }) {
                             <tr key={item.id} className="items-start">
                                 <td className="px-3 py-3 text-center text-slate-500 align-top">{idx + 1}</td>
                                 <td className="px-3 py-3 align-top">
-                                    <p className="font-medium text-slate-800">{item.service?.name || "—"}</p>
-                                    {/* Optional description if added later */}
+                                    <p className="font-medium text-slate-800">{item.service?.name || item.custom_name || "—"}</p>
+                                    {item.description && (
+                                        <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+                                    )}
                                 </td>
-                                <td className="px-3 py-3 text-center text-slate-600 align-top">{item.service?.unit || "—"}</td>
+                                <td className="px-3 py-3 text-center text-slate-600 align-top">{item.service?.unit || item.custom_unit || "—"}</td>
                                 <td className="px-3 py-3 text-right text-slate-800 align-top">{item.quantity}</td>
                                 <td className="px-3 py-3 text-right text-slate-800 align-top">{formatCurrency(item.unit_price)}</td>
                                 <td className="px-3 py-3 text-right font-medium text-slate-900 align-top">
