@@ -65,7 +65,6 @@ export default function CostModal({
             const { data } = await supabase
                 .from("partners")
                 .select("*")
-                .in("type", ["Supplier", "Both"])
                 .order("name");
             if (data) setSuppliers(data as Partner[]);
         }
