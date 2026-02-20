@@ -256,20 +256,35 @@
 @media print {
   body {
     background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
+  /* Hide all navigation / chrome */
   aside,
   header,
   nav,
-  .print\\:hidden {
+  .print\:hidden {
     display: none !important;
   }
 
+  /* Reset layout wrapper margin (the div with lg:ml-64) */
+  body * {
+    margin-left: 0 !important;
+  }
+
+  /* Reset main content */
   main {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+  }
+
+  /* Allow print background colors for the PDF */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   @page {

@@ -71,18 +71,18 @@ export default function Sidebar({ userRole }: SidebarProps) {
             {/* Logo */}
             <div className={`h-16 flex items-center px-4 border-b border-white/10 ${collapsed ? "justify-center" : ""}`}>
                 <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="flex-shrink-0 w-8 h-8 relative">
+                    <div className="flex-shrink-0 h-9 relative">
                         {/* Try to load logo.png, fallback to icon */}
                         <img
                             src="/logo.png"
                             alt="Logo"
-                            className="w-full h-full object-contain brightness-0 invert"
+                            className="h-full w-auto object-contain"
                             onError={(e) => {
                                 e.currentTarget.style.display = 'none';
                                 e.currentTarget.nextElementSibling?.classList.remove('hidden');
                             }}
                         />
-                        <div className="hidden w-full h-full bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-primary-500/30">
+                        <div className="hidden w-9 h-9 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-primary-500/30">
                             M
                         </div>
                     </div>
