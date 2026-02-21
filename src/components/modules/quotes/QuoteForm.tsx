@@ -49,6 +49,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
     const [status, setStatus] = useState<"Draft" | "Sent" | "Approved">("Draft");
     const [notes, setNotes] = useState("");
     const [vatRate, setVatRate] = useState<number>(0);
+    const [createdAt, setCreatedAt] = useState<string>(new Date().toISOString().split("T")[0]);
     const [items, setItems] = useState<QuoteItemRow[]>([]);
     const [serviceModalOpen, setServiceModalOpen] = useState(false);
     const [serviceModalForIndex, setServiceModalForIndex] = useState<number | null>(null);
@@ -83,6 +84,9 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                     setStatus(quote.status as "Draft" | "Sent" | "Approved");
                     setNotes((quote.notes as string) || "");
                     setVatRate(Number(quote.vat_rate) || 0);
+                    if (quote.created_at) {
+                        setCreatedAt(new Date(quote.created_at as string).toISOString().split("T")[0]);
+                    }
 
                     const { data: qItems } = await supabase
                         .from("quote_items")
@@ -277,6 +281,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                     vat_rate: vatRate,
                     status: finalStatus,
                     notes: notes || null,
+                    created_at: new Date(createdAt).toISOString(),
                 })
                 .eq("id", quoteId);
 
@@ -322,6 +327,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                     status: finalStatus,
                     notes: notes || null,
                     created_by: user.id,
+                    created_at: new Date(createdAt).toISOString(),
                 })
                 .select("id")
                 .single();
@@ -393,7 +399,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
 
             {/* Client & Status */}
             <div className="card p-4 sm:p-6 mb-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label className="label">
                             Khách hàng <span className="text-red-500">*</span>
@@ -425,6 +431,15 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                             <option value="Sent">Đã gửi</option>
                             <option value="Approved">Đã duyệt</option>
                         </select>
+                    </div>
+                    <div>
+                        <label className="label">Ngày tạo</label>
+                        <input
+                            type="date"
+                            value={createdAt}
+                            onChange={(e) => setCreatedAt(e.target.value)}
+                            className="input"
+                        />
                     </div>
                 </div>
                 <div className="mt-4">
