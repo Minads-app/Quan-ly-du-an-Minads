@@ -475,45 +475,56 @@ export default function ContractDetail() {
 
                     <div className="card p-6">
                         <h3 className="font-semibold text-slate-900 mb-4">Tóm tắt chi phí</h3>
-                        <div className="space-y-4">
-                            <div className="flex justify-between border-b border-slate-100 pb-2">
-                                <span className="text-slate-500">Giá trị hợp đồng</span>
-                                <span className="font-bold text-primary-600">
-                                    {formatCurrency(contract.total_value)}
-                                </span>
-                            </div>
-                            <div className="flex justify-between border-b border-slate-100 pb-2">
-                                <span className="text-slate-500">Tổng chi phí</span>
-                                <span className="font-bold text-red-600">
-                                    {formatCurrency(totalCost)}
-                                </span>
-                            </div>
-                            <div className="flex justify-between pb-2">
-                                <span className="text-slate-500">Lợi nhuận dự kiến</span>
-                                <span className={`font-bold ${contract.total_value - totalCost >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                    {formatCurrency(contract.total_value - totalCost)}
-                                </span>
-                            </div>
-                            {contract.total_value > 0 && (
-                                <div>
-                                    <div className="flex justify-between text-xs text-slate-500 mb-1">
-                                        <span>Tỷ lệ chi phí</span>
-                                        <span>{((totalCost / contract.total_value) * 100).toFixed(1)}%</span>
+                        {(() => {
+                            const vatRate = (contract as any).vat_rate || 0;
+                            const preTaxValue = vatRate > 0 ? contract.total_value / (1 + vatRate / 100) : contract.total_value;
+                            const profit = preTaxValue - totalCost;
+                            const costRatio = preTaxValue > 0 ? totalCost / preTaxValue : 0;
+                            return (
+                                <div className="space-y-4">
+                                    <div className="flex justify-between border-b border-slate-100 pb-2">
+                                        <span className="text-slate-500">
+                                            Giá trị HĐ (trước thuế)
+                                            {vatRate > 0 && <span className="text-xs text-slate-400 ml-1">VAT {vatRate}%</span>}
+                                        </span>
+                                        <span className="font-bold text-primary-600">
+                                            {formatCurrency(preTaxValue)}
+                                        </span>
                                     </div>
-                                    <div className="w-full bg-slate-100 rounded-full h-2.5">
-                                        <div
-                                            className={`h-2.5 rounded-full transition-all ${(totalCost / contract.total_value) > 0.9
-                                                ? "bg-red-500"
-                                                : (totalCost / contract.total_value) > 0.7
-                                                    ? "bg-amber-500"
-                                                    : "bg-green-500"
-                                                }`}
-                                            style={{ width: `${Math.min((totalCost / contract.total_value) * 100, 100)}%` }}
-                                        />
+                                    <div className="flex justify-between border-b border-slate-100 pb-2">
+                                        <span className="text-slate-500">Tổng chi phí</span>
+                                        <span className="font-bold text-red-600">
+                                            {formatCurrency(totalCost)}
+                                        </span>
                                     </div>
+                                    <div className="flex justify-between pb-2">
+                                        <span className="text-slate-500">Lợi nhuận dự kiến</span>
+                                        <span className={`font-bold ${profit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                            {formatCurrency(profit)}
+                                        </span>
+                                    </div>
+                                    {preTaxValue > 0 && (
+                                        <div>
+                                            <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                                <span>Tỷ lệ chi phí</span>
+                                                <span>{(costRatio * 100).toFixed(1)}%</span>
+                                            </div>
+                                            <div className="w-full bg-slate-100 rounded-full h-2.5">
+                                                <div
+                                                    className={`h-2.5 rounded-full transition-all ${costRatio > 0.9
+                                                        ? "bg-red-500"
+                                                        : costRatio > 0.7
+                                                            ? "bg-amber-500"
+                                                            : "bg-green-500"
+                                                        }`}
+                                                    style={{ width: `${Math.min(costRatio * 100, 100)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
+                            );
+                        })()}
                         <button
                             onClick={() => setActiveTab("costs")}
                             className="mt-4 text-sm text-primary-600 hover:underline"
@@ -525,500 +536,506 @@ export default function ContractDetail() {
             )}
 
             {/* Costs Tab */}
-            {activeTab === "costs" && (
-                <div className="animate-fade-in">
-                    <div className="flex justify-between items-center mb-4">
-                        <div>
-                            <h3 className="text-lg font-semibold text-slate-900">
-                                Danh sách chi phí
-                            </h3>
-                            <p className="text-sm text-slate-500">
-                                Tổng chi phí: <span className="font-bold text-red-600">{formatCurrency(totalCost)}</span>
-                                {contract.total_value > 0 && (
-                                    <span className="ml-2 text-slate-400">
-                                        ({((totalCost / contract.total_value) * 100).toFixed(1)}% giá trị HĐ)
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                        <button onClick={handleCreateCost} className="btn-primary">
-                            <Plus className="w-4 h-4" />
-                            Thêm chi phí
-                        </button>
-                    </div>
-
-                    {loadingCosts ? (
-                        <div className="flex justify-center py-12">
-                            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                        </div>
-                    ) : costs.length === 0 ? (
-                        <div className="card p-8 text-center text-slate-500">
-                            Chưa có chi phí nào được ghi nhận.
-                            <br />
-                            <button
-                                onClick={handleCreateCost}
-                                className="mt-2 text-primary-600 hover:underline text-sm"
-                            >
-                                Thêm chi phí đầu tiên
+            {
+                activeTab === "costs" && (
+                    <div className="animate-fade-in">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">
+                                    Danh sách chi phí
+                                </h3>
+                                <p className="text-sm text-slate-500">
+                                    Tổng chi phí: <span className="font-bold text-red-600">{formatCurrency(totalCost)}</span>
+                                    {contract.total_value > 0 && (
+                                        <span className="ml-2 text-slate-400">
+                                            ({((totalCost / contract.total_value) * 100).toFixed(1)}% giá trị HĐ)
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                            <button onClick={handleCreateCost} className="btn-primary">
+                                <Plus className="w-4 h-4" />
+                                Thêm chi phí
                             </button>
                         </div>
-                    ) : (
-                        <>
-                            {/* Mobile Cards */}
-                            <div className="space-y-3 lg:hidden">
-                                {costs.map((cost) => (
-                                    <div key={cost.id} className="card p-4">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <span className={`badge ${getCategoryColor(cost.cost_category)}`}>
-                                                    {getCategoryLabel(cost.cost_category)}
-                                                </span>
-                                                {cost.supplier && (
-                                                    <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
-                                                        <LinkIcon className="w-3 h-3" />
-                                                        {cost.supplier.name}
-                                                    </div>
-                                                )}
-                                                {cost.debt ? (
-                                                    <div className="mt-1">
-                                                        {cost.debt.paid_amount >= cost.debt.total_amount ? (
-                                                            <span className="badge bg-green-50 text-green-700 text-[10px]">✅ Đã thanh toán</span>
-                                                        ) : cost.debt.paid_amount > 0 ? (
-                                                            <span className="badge bg-amber-50 text-amber-700 text-[10px]">⏳ TT {formatCurrency(cost.debt.paid_amount)}/{formatCurrency(cost.debt.total_amount)}</span>
-                                                        ) : (
-                                                            <span className="badge bg-red-50 text-red-600 text-[10px]">❌ Chưa thanh toán</span>
-                                                        )}
-                                                    </div>
-                                                ) : cost.supplier ? (
-                                                    <div className="mt-1">
-                                                        <span className="badge bg-red-50 text-red-600 text-[10px]">❌ Chưa thanh toán</span>
-                                                    </div>
-                                                ) : null}
-                                            </div>
-                                            <span className="font-bold text-slate-900">
-                                                {formatCurrency(cost.amount)}
-                                            </span>
-                                        </div>
-                                        {cost.description && (
-                                            <p className="text-sm text-slate-600 mb-2 line-clamp-2">{cost.description}</p>
-                                        )}
-                                        <div className="flex justify-end gap-1 pt-2 border-t border-slate-100">
-                                            <button
-                                                onClick={() => handleEditCost(cost)}
-                                                className="btn-sm btn-secondary"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => setDeleteCost(cost)}
-                                                className="btn-sm bg-red-50 text-red-600 hover:bg-red-100 border-red-100"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
 
-                            {/* Desktop Table */}
-                            <div className="hidden lg:block card overflow-hidden">
-                                <table className="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Loại</th>
-                                            <th>Mô tả</th>
-                                            <th>Nhà cung cấp</th>
-                                            <th className="text-right">Số tiền</th>
-                                            <th className="text-center w-24">Thanh toán</th>
-                                            <th className="text-right w-24">Thao tác</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {costs.map((cost) => (
-                                            <tr key={cost.id}>
-                                                <td>
+                        {loadingCosts ? (
+                            <div className="flex justify-center py-12">
+                                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                            </div>
+                        ) : costs.length === 0 ? (
+                            <div className="card p-8 text-center text-slate-500">
+                                Chưa có chi phí nào được ghi nhận.
+                                <br />
+                                <button
+                                    onClick={handleCreateCost}
+                                    className="mt-2 text-primary-600 hover:underline text-sm"
+                                >
+                                    Thêm chi phí đầu tiên
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Mobile Cards */}
+                                <div className="space-y-3 lg:hidden">
+                                    {costs.map((cost) => (
+                                        <div key={cost.id} className="card p-4">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
                                                     <span className={`badge ${getCategoryColor(cost.cost_category)}`}>
                                                         {getCategoryLabel(cost.cost_category)}
                                                     </span>
-                                                </td>
-                                                <td className="max-w-[200px] truncate" title={cost.description || ""}>
-                                                    {cost.description || "—"}
-                                                </td>
-                                                <td>{cost.supplier?.name || "—"}</td>
-                                                <td className="text-right font-medium text-slate-900">
-                                                    {formatCurrency(cost.amount)}
-                                                </td>
-                                                <td className="text-center">
-                                                    {cost.debt ? (
-                                                        cost.debt.paid_amount >= cost.debt.total_amount ? (
-                                                            <span className="badge bg-green-50 text-green-700 text-xs">✅ Đã TT</span>
-                                                        ) : cost.debt.paid_amount > 0 ? (
-                                                            <div>
-                                                                <span className="badge bg-amber-50 text-amber-700 text-xs">⏳ TT 1 phần</span>
-                                                                <p className="text-[10px] text-slate-500 mt-0.5">{formatCurrency(cost.debt.paid_amount)}/{formatCurrency(cost.debt.total_amount)}</p>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="badge bg-red-50 text-red-600 text-xs">❌ Chưa TT</span>
-                                                        )
-                                                    ) : cost.supplier ? (
-                                                        <span className="badge bg-red-50 text-red-600 text-xs">❌ Chưa TT</span>
-                                                    ) : (
-                                                        <span className="text-slate-300">—</span>
+                                                    {cost.supplier && (
+                                                        <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                                                            <LinkIcon className="w-3 h-3" />
+                                                            {cost.supplier.name}
+                                                        </div>
                                                     )}
-                                                </td>
-                                                <td>
-                                                    <div className="flex justify-end gap-1">
-                                                        <button
-                                                            onClick={() => handleEditCost(cost)}
-                                                            className="p-1.5 rounded text-slate-400 hover:text-primary-600"
-                                                        >
-                                                            <Edit2 className="w-4 h-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setDeleteCost(cost)}
-                                                            className="p-1.5 rounded text-slate-400 hover:text-red-600"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                                    {cost.debt ? (
+                                                        <div className="mt-1">
+                                                            {cost.debt.paid_amount >= cost.debt.total_amount ? (
+                                                                <span className="badge bg-green-50 text-green-700 text-[10px]">✅ Đã thanh toán</span>
+                                                            ) : cost.debt.paid_amount > 0 ? (
+                                                                <span className="badge bg-amber-50 text-amber-700 text-[10px]">⏳ TT {formatCurrency(cost.debt.paid_amount)}/{formatCurrency(cost.debt.total_amount)}</span>
+                                                            ) : (
+                                                                <span className="badge bg-red-50 text-red-600 text-[10px]">❌ Chưa thanh toán</span>
+                                                            )}
+                                                        </div>
+                                                    ) : cost.supplier ? (
+                                                        <div className="mt-1">
+                                                            <span className="badge bg-red-50 text-red-600 text-[10px]">❌ Chưa thanh toán</span>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                                <span className="font-bold text-slate-900">
+                                                    {formatCurrency(cost.amount)}
+                                                </span>
+                                            </div>
+                                            {cost.description && (
+                                                <p className="text-sm text-slate-600 mb-2 line-clamp-2">{cost.description}</p>
+                                            )}
+                                            <div className="flex justify-end gap-1 pt-2 border-t border-slate-100">
+                                                <button
+                                                    onClick={() => handleEditCost(cost)}
+                                                    className="btn-sm btn-secondary"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => setDeleteCost(cost)}
+                                                    className="btn-sm bg-red-50 text-red-600 hover:bg-red-100 border-red-100"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Desktop Table */}
+                                <div className="hidden lg:block card overflow-hidden">
+                                    <table className="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Loại</th>
+                                                <th>Mô tả</th>
+                                                <th>Nhà cung cấp</th>
+                                                <th className="text-right">Số tiền</th>
+                                                <th className="text-center w-24">Thanh toán</th>
+                                                <th className="text-right w-24">Thao tác</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </>
-                    )}
-                </div>
-            )}
+                                        </thead>
+                                        <tbody>
+                                            {costs.map((cost) => (
+                                                <tr key={cost.id}>
+                                                    <td>
+                                                        <span className={`badge ${getCategoryColor(cost.cost_category)}`}>
+                                                            {getCategoryLabel(cost.cost_category)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="max-w-[200px] truncate" title={cost.description || ""}>
+                                                        {cost.description || "—"}
+                                                    </td>
+                                                    <td>{cost.supplier?.name || "—"}</td>
+                                                    <td className="text-right font-medium text-slate-900">
+                                                        {formatCurrency(cost.amount)}
+                                                    </td>
+                                                    <td className="text-center">
+                                                        {cost.debt ? (
+                                                            cost.debt.paid_amount >= cost.debt.total_amount ? (
+                                                                <span className="badge bg-green-50 text-green-700 text-xs">✅ Đã TT</span>
+                                                            ) : cost.debt.paid_amount > 0 ? (
+                                                                <div>
+                                                                    <span className="badge bg-amber-50 text-amber-700 text-xs">⏳ TT 1 phần</span>
+                                                                    <p className="text-[10px] text-slate-500 mt-0.5">{formatCurrency(cost.debt.paid_amount)}/{formatCurrency(cost.debt.total_amount)}</p>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="badge bg-red-50 text-red-600 text-xs">❌ Chưa TT</span>
+                                                            )
+                                                        ) : cost.supplier ? (
+                                                            <span className="badge bg-red-50 text-red-600 text-xs">❌ Chưa TT</span>
+                                                        ) : (
+                                                            <span className="text-slate-300">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <div className="flex justify-end gap-1">
+                                                            <button
+                                                                onClick={() => handleEditCost(cost)}
+                                                                className="p-1.5 rounded text-slate-400 hover:text-primary-600"
+                                                            >
+                                                                <Edit2 className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setDeleteCost(cost)}
+                                                                className="p-1.5 rounded text-slate-400 hover:text-red-600"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )
+            }
 
             {/* Payments Tab */}
-            {activeTab === "payments" && (
-                <div className="animate-fade-in">
-                    {/* Payment progress */}
-                    <div className="card p-6 mb-6">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                                    <TrendingUp className="w-5 h-5 text-green-500" />
-                                    Tiến độ thanh toán
-                                </h3>
-                                <p className="text-sm text-slate-500 mt-1">
-                                    Đã thu {formatCurrency(totalPaid)} / {formatCurrency(contract.total_value)}
-                                </p>
+            {
+                activeTab === "payments" && (
+                    <div className="animate-fade-in">
+                        {/* Payment progress */}
+                        <div className="card p-6 mb-6">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                                        <TrendingUp className="w-5 h-5 text-green-500" />
+                                        Tiến độ thanh toán
+                                    </h3>
+                                    <p className="text-sm text-slate-500 mt-1">
+                                        Đã thu {formatCurrency(totalPaid)} / {formatCurrency(contract.total_value)}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <span className={`text-2xl font-bold ${totalPaid >= contract.total_value ? "text-green-600" : "text-amber-600"}`}>
+                                        {contract.total_value > 0 ? ((totalPaid / contract.total_value) * 100).toFixed(1) : 0}%
+                                    </span>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <span className={`text-2xl font-bold ${totalPaid >= contract.total_value ? "text-green-600" : "text-amber-600"}`}>
-                                    {contract.total_value > 0 ? ((totalPaid / contract.total_value) * 100).toFixed(1) : 0}%
-                                </span>
+                            <div className="w-full bg-slate-100 rounded-full h-3">
+                                <div
+                                    className={`h-3 rounded-full transition-all ${totalPaid >= contract.total_value
+                                        ? "bg-green-500"
+                                        : (totalPaid / contract.total_value) > 0.5
+                                            ? "bg-amber-500"
+                                            : "bg-blue-500"
+                                        }`}
+                                    style={{ width: `${Math.min((totalPaid / contract.total_value) * 100, 100)}%` }}
+                                />
+                            </div>
+                            <div className="flex justify-between mt-2 text-xs text-slate-500">
+                                <span>Còn lại: {formatCurrency(Math.max(0, contract.total_value - totalPaid))}</span>
+                                <span>{payments.length} đợt thanh toán</span>
                             </div>
                         </div>
-                        <div className="w-full bg-slate-100 rounded-full h-3">
-                            <div
-                                className={`h-3 rounded-full transition-all ${totalPaid >= contract.total_value
-                                    ? "bg-green-500"
-                                    : (totalPaid / contract.total_value) > 0.5
-                                        ? "bg-amber-500"
-                                        : "bg-blue-500"
-                                    }`}
-                                style={{ width: `${Math.min((totalPaid / contract.total_value) * 100, 100)}%` }}
-                            />
-                        </div>
-                        <div className="flex justify-between mt-2 text-xs text-slate-500">
-                            <span>Còn lại: {formatCurrency(Math.max(0, contract.total_value - totalPaid))}</span>
-                            <span>{payments.length} đợt thanh toán</span>
-                        </div>
-                    </div>
 
-                    {/* Add payment button */}
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold text-slate-900">Lịch sử thanh toán</h3>
-                        <button onClick={() => setIsPaymentModalOpen(true)} className="btn-primary">
-                            <Plus className="w-4 h-4" />
-                            Tạo phiếu thu
-                        </button>
-                    </div>
-
-                    {loadingPayments ? (
-                        <div className="flex justify-center py-12">
-                            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                        </div>
-                    ) : payments.length === 0 ? (
-                        <div className="card p-8 text-center text-slate-500">
-                            Chưa có đợt thanh toán nào.
-                            <br />
-                            <button
-                                onClick={() => setIsPaymentModalOpen(true)}
-                                className="mt-2 text-primary-600 hover:underline text-sm"
-                            >
-                                Tạo phiếu thu đầu tiên
+                        {/* Add payment button */}
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold text-slate-900">Lịch sử thanh toán</h3>
+                            <button onClick={() => setIsPaymentModalOpen(true)} className="btn-primary">
+                                <Plus className="w-4 h-4" />
+                                Tạo phiếu thu
                             </button>
                         </div>
-                    ) : (
-                        <>
-                            {/* Mobile Cards */}
-                            <div className="space-y-3 lg:hidden">
-                                {payments.map((p) => (
-                                    <div key={p.id} className="card p-4">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <Receipt className="w-4 h-4 text-green-500" />
-                                                    <span className="font-medium text-slate-900">{p.partner?.name}</span>
+
+                        {loadingPayments ? (
+                            <div className="flex justify-center py-12">
+                                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                            </div>
+                        ) : payments.length === 0 ? (
+                            <div className="card p-8 text-center text-slate-500">
+                                Chưa có đợt thanh toán nào.
+                                <br />
+                                <button
+                                    onClick={() => setIsPaymentModalOpen(true)}
+                                    className="mt-2 text-primary-600 hover:underline text-sm"
+                                >
+                                    Tạo phiếu thu đầu tiên
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Mobile Cards */}
+                                <div className="space-y-3 lg:hidden">
+                                    {payments.map((p) => (
+                                        <div key={p.id} className="card p-4">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Receipt className="w-4 h-4 text-green-500" />
+                                                        <span className="font-medium text-slate-900">{p.partner?.name}</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                        {formatDate(p.transaction_date)}
+                                                    </p>
                                                 </div>
-                                                <p className="text-xs text-slate-500 mt-0.5">
-                                                    {formatDate(p.transaction_date)}
-                                                </p>
+                                                <span className="text-lg font-bold text-green-600">
+                                                    +{formatCurrency(p.amount)}
+                                                </span>
                                             </div>
-                                            <span className="text-lg font-bold text-green-600">
-                                                +{formatCurrency(p.amount)}
-                                            </span>
+                                            {p.description && (
+                                                <p className="text-sm text-slate-600 mb-2">{p.description}</p>
+                                            )}
+                                            <div className="flex justify-end pt-2 border-t border-slate-100">
+                                                <button
+                                                    onClick={() => setDeletePayment(p)}
+                                                    className="btn-sm bg-red-50 text-red-600 hover:bg-red-100 border-red-100"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
-                                        {p.description && (
-                                            <p className="text-sm text-slate-600 mb-2">{p.description}</p>
+                                    ))}
+                                </div>
+
+                                {/* Desktop Table */}
+                                <div className="hidden lg:block card overflow-hidden">
+                                    <table className="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Ngày</th>
+                                                <th>Đối tác</th>
+                                                <th>Nội dung</th>
+                                                <th className="text-right">Số tiền</th>
+                                                <th className="text-right w-16">...</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {payments.map((p) => (
+                                                <tr key={p.id}>
+                                                    <td className="whitespace-nowrap">{formatDate(p.transaction_date)}</td>
+                                                    <td className="font-medium">{p.partner?.name}</td>
+                                                    <td className="max-w-[200px] truncate text-sm" title={p.description || ""}>
+                                                        {p.description || "—"}
+                                                    </td>
+                                                    <td className="text-right font-bold text-green-600">
+                                                        +{formatCurrency(p.amount)}
+                                                    </td>
+                                                    <td>
+                                                        <div className="flex justify-end">
+                                                            <button
+                                                                onClick={() => setDeletePayment(p)}
+                                                                className="p-1.5 rounded text-slate-400 hover:text-red-600"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )
+            }
+
+            {/* Quote Details Tab */}
+            {
+                activeTab === "quote_details" && (
+                    <div className="animate-fade-in card overflow-hidden">
+                        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">Chi tiết hợp đồng</h3>
+                                {!contract.quote_id && addonQuotes.length === 0 && (
+                                    <p className="text-sm text-amber-600 mt-1">Hợp đồng này không có báo giá nào.</p>
+                                )}
+                            </div>
+                            <Link
+                                href={`/quotes/new?contractId=${contractId}&clientId=${contract.client_id}`}
+                                className="btn-primary py-2 px-3 text-sm h-auto w-fit"
+                            >
+                                Tạo báo giá phát sinh
+                            </Link>
+                        </div>
+
+                        {loadingQuoteDetails ? (
+                            <div className="flex justify-center py-12">
+                                <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-6 p-4">
+                                {/* Base Quote Section */}
+                                {contract.quote_id && (
+                                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                        <div className="bg-slate-50 p-3 border-b border-slate-200">
+                                            <h4 className="font-semibold text-slate-800">Báo giá gốc</h4>
+                                        </div>
+                                        {baseQuoteItems.length === 0 ? (
+                                            <div className="p-6 text-center text-slate-500">
+                                                Báo giá này không có hạng mục nào.
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="table min-w-full">
+                                                        <thead>
+                                                            <tr>
+                                                                <th className="w-12 text-center">STT</th>
+                                                                <th>Hạng mục / Dịch vụ</th>
+                                                                <th className="text-center">ĐVT</th>
+                                                                <th className="text-right">Số lượng</th>
+                                                                <th className="text-right">Đơn giá</th>
+                                                                <th className="text-right">CK (%)</th>
+                                                                <th className="text-right">Thành tiền</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {baseQuoteItems.map((item, index) => {
+                                                                const name = item.custom_name || item.service?.name || "—";
+                                                                const unit = item.custom_unit || item.service?.unit || "—";
+                                                                return (
+                                                                    <tr key={item.id}>
+                                                                        <td className="text-center text-slate-500">{index + 1}</td>
+                                                                        <td>
+                                                                            <div className="font-medium text-slate-900">{name}</div>
+                                                                            {item.description && (
+                                                                                <div className="text-xs text-slate-500 mt-1 line-clamp-2" title={item.description}>
+                                                                                    {item.description}
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="text-center">{unit}</td>
+                                                                        <td className="text-right">{item.quantity}</td>
+                                                                        <td className="text-right">{formatCurrency(item.unit_price)}</td>
+                                                                        <td className="text-right">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
+                                                                        <td className="text-right font-medium text-primary-600">{formatCurrency(item.line_total)}</td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <div className="p-4 bg-slate-50 border-t border-slate-200">
+                                                    <div className="space-y-2 max-w-sm ml-auto">
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-slate-500">Tạm tính:</span>
+                                                            <span className="font-medium">{formatCurrency(quoteSubtotal)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-slate-500">Thuế VAT ({quoteVatRate}%):</span>
+                                                            <span className="font-medium">{formatCurrency(quoteSubtotal * (quoteVatRate / 100))}</span>
+                                                        </div>
+                                                        <div className="flex justify-between font-bold text-lg pt-2 border-t border-slate-200">
+                                                            <span className="text-slate-700">Tổng cộng:</span>
+                                                            <span className="text-primary-600">{formatCurrency(quoteSubtotal * (1 + quoteVatRate / 100))}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         )}
-                                        <div className="flex justify-end pt-2 border-t border-slate-100">
-                                            <button
-                                                onClick={() => setDeletePayment(p)}
-                                                className="btn-sm bg-red-50 text-red-600 hover:bg-red-100 border-red-100"
+                                    </div>
+                                )}
+
+                                {/* Add-on Quotes Section */}
+                                {addonQuotes.map((addon, aIndex) => (
+                                    <div key={addon.id} className="border border-indigo-200 rounded-lg overflow-hidden">
+                                        <div className="bg-indigo-50 p-3 border-b border-indigo-200 flex justify-between items-center">
+                                            <h4 className="font-semibold text-indigo-800">
+                                                Báo giá phát sinh #{aIndex + 1}
+                                            </h4>
+                                            <Link
+                                                href={`/quotes/${addon.id}`}
+                                                className="text-sm text-indigo-600 hover:text-indigo-800 underline"
                                             >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                                Chi tiết báo giá
+                                            </Link>
                                         </div>
+                                        {addon.items.length === 0 ? (
+                                            <div className="p-6 text-center text-slate-500">
+                                                Báo giá phát sinh này không có hạng mục nào.
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="table min-w-full">
+                                                        <thead>
+                                                            <tr className="bg-slate-50">
+                                                                <th className="w-12 text-center text-slate-500">STT</th>
+                                                                <th className="text-slate-500">Hạng mục / Dịch vụ</th>
+                                                                <th className="text-center text-slate-500">ĐVT</th>
+                                                                <th className="text-right text-slate-500">Số lượng</th>
+                                                                <th className="text-right text-slate-500">Đơn giá</th>
+                                                                <th className="text-right text-slate-500">CK (%)</th>
+                                                                <th className="text-right text-slate-500">Thành tiền</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {addon.items.map((item, index) => {
+                                                                const name = item.custom_name || item.service?.name || "—";
+                                                                const unit = item.custom_unit || item.service?.unit || "—";
+                                                                return (
+                                                                    <tr key={item.id}>
+                                                                        <td className="text-center text-slate-500">{index + 1}</td>
+                                                                        <td>
+                                                                            <div className="font-medium text-slate-900">{name}</div>
+                                                                            {item.description && (
+                                                                                <div className="text-xs text-slate-500 mt-1 line-clamp-2" title={item.description}>
+                                                                                    {item.description}
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="text-center">{unit}</td>
+                                                                        <td className="text-right">{item.quantity}</td>
+                                                                        <td className="text-right">{formatCurrency(item.unit_price)}</td>
+                                                                        <td className="text-right">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
+                                                                        <td className="text-right font-medium text-primary-600">{formatCurrency(item.line_total)}</td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <div className="p-4 bg-indigo-50/30 border-t border-indigo-100">
+                                                    <div className="space-y-2 max-w-sm ml-auto">
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-slate-500">Tạm tính:</span>
+                                                            <span className="font-medium">
+                                                                {formatCurrency(
+                                                                    addon.items.reduce((sum, item) => sum + item.line_total, 0)
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-slate-500">Thuế VAT ({addon.vat_rate}%):</span>
+                                                            <span className="font-medium">
+                                                                {formatCurrency(
+                                                                    addon.items.reduce((sum, item) => sum + item.line_total, 0) * (addon.vat_rate / 100)
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between font-bold text-lg pt-2 border-t border-indigo-200">
+                                                            <span className="text-slate-700">Tổng cộng:</span>
+                                                            <span className="text-primary-600">{formatCurrency(addon.total_amount)}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
-
-                            {/* Desktop Table */}
-                            <div className="hidden lg:block card overflow-hidden">
-                                <table className="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Ngày</th>
-                                            <th>Đối tác</th>
-                                            <th>Nội dung</th>
-                                            <th className="text-right">Số tiền</th>
-                                            <th className="text-right w-16">...</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {payments.map((p) => (
-                                            <tr key={p.id}>
-                                                <td className="whitespace-nowrap">{formatDate(p.transaction_date)}</td>
-                                                <td className="font-medium">{p.partner?.name}</td>
-                                                <td className="max-w-[200px] truncate text-sm" title={p.description || ""}>
-                                                    {p.description || "—"}
-                                                </td>
-                                                <td className="text-right font-bold text-green-600">
-                                                    +{formatCurrency(p.amount)}
-                                                </td>
-                                                <td>
-                                                    <div className="flex justify-end">
-                                                        <button
-                                                            onClick={() => setDeletePayment(p)}
-                                                            className="p-1.5 rounded text-slate-400 hover:text-red-600"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </>
-                    )}
-                </div>
-            )}
-
-            {/* Quote Details Tab */}
-            {activeTab === "quote_details" && (
-                <div className="animate-fade-in card overflow-hidden">
-                    <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                        <div>
-                            <h3 className="text-lg font-semibold text-slate-900">Chi tiết hợp đồng</h3>
-                            {!contract.quote_id && addonQuotes.length === 0 && (
-                                <p className="text-sm text-amber-600 mt-1">Hợp đồng này không có báo giá nào.</p>
-                            )}
-                        </div>
-                        <Link
-                            href={`/quotes/new?contractId=${contractId}&clientId=${contract.client_id}`}
-                            className="btn-primary py-2 px-3 text-sm h-auto w-fit"
-                        >
-                            Tạo báo giá phát sinh
-                        </Link>
+                        )}
                     </div>
-
-                    {loadingQuoteDetails ? (
-                        <div className="flex justify-center py-12">
-                            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                        </div>
-                    ) : (
-                        <div className="flex flex-col gap-6 p-4">
-                            {/* Base Quote Section */}
-                            {contract.quote_id && (
-                                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                                    <div className="bg-slate-50 p-3 border-b border-slate-200">
-                                        <h4 className="font-semibold text-slate-800">Báo giá gốc</h4>
-                                    </div>
-                                    {baseQuoteItems.length === 0 ? (
-                                        <div className="p-6 text-center text-slate-500">
-                                            Báo giá này không có hạng mục nào.
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <div className="overflow-x-auto">
-                                                <table className="table min-w-full">
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="w-12 text-center">STT</th>
-                                                            <th>Hạng mục / Dịch vụ</th>
-                                                            <th className="text-center">ĐVT</th>
-                                                            <th className="text-right">Số lượng</th>
-                                                            <th className="text-right">Đơn giá</th>
-                                                            <th className="text-right">CK (%)</th>
-                                                            <th className="text-right">Thành tiền</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {baseQuoteItems.map((item, index) => {
-                                                            const name = item.custom_name || item.service?.name || "—";
-                                                            const unit = item.custom_unit || item.service?.unit || "—";
-                                                            return (
-                                                                <tr key={item.id}>
-                                                                    <td className="text-center text-slate-500">{index + 1}</td>
-                                                                    <td>
-                                                                        <div className="font-medium text-slate-900">{name}</div>
-                                                                        {item.description && (
-                                                                            <div className="text-xs text-slate-500 mt-1 line-clamp-2" title={item.description}>
-                                                                                {item.description}
-                                                                            </div>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="text-center">{unit}</td>
-                                                                    <td className="text-right">{item.quantity}</td>
-                                                                    <td className="text-right">{formatCurrency(item.unit_price)}</td>
-                                                                    <td className="text-right">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
-                                                                    <td className="text-right font-medium text-primary-600">{formatCurrency(item.line_total)}</td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                            <div className="p-4 bg-slate-50 border-t border-slate-200">
-                                                <div className="space-y-2 max-w-sm ml-auto">
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className="text-slate-500">Tạm tính:</span>
-                                                        <span className="font-medium">{formatCurrency(quoteSubtotal)}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className="text-slate-500">Thuế VAT ({quoteVatRate}%):</span>
-                                                        <span className="font-medium">{formatCurrency(quoteSubtotal * (quoteVatRate / 100))}</span>
-                                                    </div>
-                                                    <div className="flex justify-between font-bold text-lg pt-2 border-t border-slate-200">
-                                                        <span className="text-slate-700">Tổng cộng:</span>
-                                                        <span className="text-primary-600">{formatCurrency(quoteSubtotal * (1 + quoteVatRate / 100))}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Add-on Quotes Section */}
-                            {addonQuotes.map((addon, aIndex) => (
-                                <div key={addon.id} className="border border-indigo-200 rounded-lg overflow-hidden">
-                                    <div className="bg-indigo-50 p-3 border-b border-indigo-200 flex justify-between items-center">
-                                        <h4 className="font-semibold text-indigo-800">
-                                            Báo giá phát sinh #{aIndex + 1}
-                                        </h4>
-                                        <Link
-                                            href={`/quotes/${addon.id}`}
-                                            className="text-sm text-indigo-600 hover:text-indigo-800 underline"
-                                        >
-                                            Chi tiết báo giá
-                                        </Link>
-                                    </div>
-                                    {addon.items.length === 0 ? (
-                                        <div className="p-6 text-center text-slate-500">
-                                            Báo giá phát sinh này không có hạng mục nào.
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <div className="overflow-x-auto">
-                                                <table className="table min-w-full">
-                                                    <thead>
-                                                        <tr className="bg-slate-50">
-                                                            <th className="w-12 text-center text-slate-500">STT</th>
-                                                            <th className="text-slate-500">Hạng mục / Dịch vụ</th>
-                                                            <th className="text-center text-slate-500">ĐVT</th>
-                                                            <th className="text-right text-slate-500">Số lượng</th>
-                                                            <th className="text-right text-slate-500">Đơn giá</th>
-                                                            <th className="text-right text-slate-500">CK (%)</th>
-                                                            <th className="text-right text-slate-500">Thành tiền</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {addon.items.map((item, index) => {
-                                                            const name = item.custom_name || item.service?.name || "—";
-                                                            const unit = item.custom_unit || item.service?.unit || "—";
-                                                            return (
-                                                                <tr key={item.id}>
-                                                                    <td className="text-center text-slate-500">{index + 1}</td>
-                                                                    <td>
-                                                                        <div className="font-medium text-slate-900">{name}</div>
-                                                                        {item.description && (
-                                                                            <div className="text-xs text-slate-500 mt-1 line-clamp-2" title={item.description}>
-                                                                                {item.description}
-                                                                            </div>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="text-center">{unit}</td>
-                                                                    <td className="text-right">{item.quantity}</td>
-                                                                    <td className="text-right">{formatCurrency(item.unit_price)}</td>
-                                                                    <td className="text-right">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
-                                                                    <td className="text-right font-medium text-primary-600">{formatCurrency(item.line_total)}</td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                            <div className="p-4 bg-indigo-50/30 border-t border-indigo-100">
-                                                <div className="space-y-2 max-w-sm ml-auto">
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className="text-slate-500">Tạm tính:</span>
-                                                        <span className="font-medium">
-                                                            {formatCurrency(
-                                                                addon.items.reduce((sum, item) => sum + item.line_total, 0)
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className="text-slate-500">Thuế VAT ({addon.vat_rate}%):</span>
-                                                        <span className="font-medium">
-                                                            {formatCurrency(
-                                                                addon.items.reduce((sum, item) => sum + item.line_total, 0) * (addon.vat_rate / 100)
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between font-bold text-lg pt-2 border-t border-indigo-200">
-                                                        <span className="text-slate-700">Tổng cộng:</span>
-                                                        <span className="text-primary-600">{formatCurrency(addon.total_amount)}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
+                )
+            }
 
             <ContractCostModal
                 contractId={contractId}
@@ -1041,25 +1058,29 @@ export default function ContractDetail() {
                 defaultContractId={contractId}
             />
 
-            {deleteCost && (
-                <DeleteConfirm
-                    title="Xóa chi phí"
-                    message="Bạn có chắc muốn xóa khoản chi này? Khoản phải trả liên kết (nếu có) cũng sẽ bị xóa."
-                    loading={deletingCost}
-                    onConfirm={handleDeleteCost}
-                    onCancel={() => setDeleteCost(null)}
-                />
-            )}
+            {
+                deleteCost && (
+                    <DeleteConfirm
+                        title="Xóa chi phí"
+                        message="Bạn có chắc muốn xóa khoản chi này? Khoản phải trả liên kết (nếu có) cũng sẽ bị xóa."
+                        loading={deletingCost}
+                        onConfirm={handleDeleteCost}
+                        onCancel={() => setDeleteCost(null)}
+                    />
+                )
+            }
 
-            {deletePayment && (
-                <DeleteConfirm
-                    title="Xóa phiếu thu"
-                    message="Bạn có chắc muốn xóa phiếu thu này? Số tiền đã ghi nhận vào công nợ sẽ được hoàn trả."
-                    loading={deletingPayment}
-                    onConfirm={handleDeletePayment}
-                    onCancel={() => setDeletePayment(null)}
-                />
-            )}
-        </div>
+            {
+                deletePayment && (
+                    <DeleteConfirm
+                        title="Xóa phiếu thu"
+                        message="Bạn có chắc muốn xóa phiếu thu này? Số tiền đã ghi nhận vào công nợ sẽ được hoàn trả."
+                        loading={deletingPayment}
+                        onConfirm={handleDeletePayment}
+                        onCancel={() => setDeletePayment(null)}
+                    />
+                )
+            }
+        </div >
     );
 }
