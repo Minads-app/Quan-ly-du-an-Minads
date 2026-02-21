@@ -88,11 +88,52 @@ export default function ContractDetail() {
     const [quoteVatRate, setQuoteVatRate] = useState<number>(0);
     const [quoteSubtotal, setQuoteSubtotal] = useState<number>(0);
 
-    // Fetch Contract Info
+    // Helper function to load costs data
+    const loadCostsData = useCallback(async (supabaseClient: ReturnType<typeof createClient>, cId: string) => {
+        const { data } = await supabaseClient
+            .from("contract_costs")
+            .select("*, supplier:partners!supplier_id(name)")
+            .eq("contract_id", cId)
+            .order("created_at", { ascending: false });
+
+        if (data) {
+            const costIds = data.map((c: any) => c.id);
+            let debtMap = new Map<string, CostDebtInfo>();
+            if (costIds.length > 0) {
+                const { data: debts } = await supabaseClient
+                    .from("debts")
+                    .select("id, total_amount, paid_amount, contract_cost_id")
+                    .in("contract_cost_id", costIds);
+
+                if (debts) {
+                    debts.forEach((d: any) => {
+                        if (d.contract_cost_id) {
+                            debtMap.set(d.contract_cost_id, {
+                                id: d.id,
+                                total_amount: d.total_amount,
+                                paid_amount: d.paid_amount,
+                            });
+                        }
+                    });
+                }
+            }
+
+            const fixedData = data.map((item: any) => ({
+                ...item,
+                supplier: Array.isArray(item.supplier) ? item.supplier[0] : item.supplier,
+                debt: debtMap.get(item.id) || null,
+            }));
+            return fixedData as ContractCostRow[];
+        }
+        return [];
+    }, []);
+
+    // Fetch Contract Info + Costs on mount
     useEffect(() => {
-        async function fetchContract() {
+        async function fetchContractAndCosts() {
             setLoadingContract(true);
-            const { data, error } = await supabase
+            const sb = createClient();
+            const { data, error } = await sb
                 .from("contracts")
                 .select("*, client:partners!client_id(name)")
                 .eq("id", contractId)
@@ -109,55 +150,30 @@ export default function ContractDetail() {
             }
 
             setContract(fixedData as ExtendedContract);
+
+            // Also fetch costs immediately for overview summary
+            const costsData = await loadCostsData(sb, contractId);
+            setCosts(costsData);
+            setLoadingCosts(false);
+
             setLoadingContract(false);
         }
 
-        if (contractId) fetchContract();
-    }, [contractId, router, supabase]);
+        if (contractId) fetchContractAndCosts();
+    }, [contractId, router, loadCostsData]);
 
-    // Fetch Costs
+    // Fetch Costs (for tab refresh)
     const fetchCosts = useCallback(async () => {
         if (!contractId) return;
         setLoadingCosts(true);
-        const { data } = await supabase
-            .from("contract_costs")
-            .select("*, supplier:partners!supplier_id(name)")
-            .eq("contract_id", contractId)
-            .order("created_at", { ascending: false });
-
-        if (data) {
-            // Fetch debts linked to these costs
-            const costIds = data.map((c: any) => c.id);
-            const { data: debts } = await supabase
-                .from("debts")
-                .select("id, total_amount, paid_amount, contract_cost_id")
-                .in("contract_cost_id", costIds);
-
-            const debtMap = new Map<string, CostDebtInfo>();
-            if (debts) {
-                debts.forEach((d: any) => {
-                    if (d.contract_cost_id) {
-                        debtMap.set(d.contract_cost_id, {
-                            id: d.id,
-                            total_amount: d.total_amount,
-                            paid_amount: d.paid_amount,
-                        });
-                    }
-                });
-            }
-
-            const fixedData = data.map((item: any) => ({
-                ...item,
-                supplier: Array.isArray(item.supplier) ? item.supplier[0] : item.supplier,
-                debt: debtMap.get(item.id) || null,
-            }));
-            setCosts(fixedData as ContractCostRow[]);
-        }
+        const sb = createClient();
+        const costsData = await loadCostsData(sb, contractId);
+        setCosts(costsData);
         setLoadingCosts(false);
-    }, [contractId, supabase]);
+    }, [contractId, loadCostsData]);
 
     useEffect(() => {
-        if (activeTab === "overview" || activeTab === "costs") {
+        if (activeTab === "costs") {
             fetchCosts();
         }
         if (activeTab === "payments") {
