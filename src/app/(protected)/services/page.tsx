@@ -128,8 +128,8 @@ export default function ServicesPage() {
                                 setFilterType(filterType === type ? "all" : type)
                             }
                             className={`stat-card cursor-pointer transition-all ${filterType === type
-                                    ? "ring-2 ring-primary-400 bg-primary-50/50"
-                                    : "hover:shadow-md"
+                                ? "ring-2 ring-primary-400 bg-primary-50/50"
+                                : "hover:shadow-md"
                                 }`}
                         >
                             <div className="stat-icon bg-slate-50">
@@ -243,11 +243,11 @@ export default function ServicesPage() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Tên dịch vụ</th>
-                                    <th>Loại</th>
-                                    <th>Đơn vị</th>
-                                    <th className="text-right">Giá mặc định</th>
-                                    <th className="text-right">Thao tác</th>
+                                    <th className="w-[40%]">Tên dịch vụ</th>
+                                    <th className="w-[15%]">Loại</th>
+                                    <th className="w-[12%]">Đơn vị</th>
+                                    <th className="text-right w-[20%]">Giá mặc định</th>
+                                    <th className="text-right w-[13%]">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -256,7 +256,7 @@ export default function ServicesPage() {
                                     const Icon = config.icon;
                                     return (
                                         <tr key={service.id}>
-                                            <td className="font-medium text-slate-900">
+                                            <td className="font-medium text-slate-900 truncate" title={service.name}>
                                                 {service.name}
                                             </td>
                                             <td>

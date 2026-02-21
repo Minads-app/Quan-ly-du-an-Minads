@@ -338,26 +338,26 @@ export default function ProjectsPage() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th className="w-10"></th>
-                                    <th>Tên dự án</th>
-                                    <th>Hợp đồng / Khách hàng</th>
-                                    <th>Trạng thái</th>
-                                    <th>Tiến độ</th>
-                                    <th>Người phụ trách</th>
-                                    <th className="text-right w-24">Thao tác</th>
+                                    <th className="w-[4%]"></th>
+                                    <th className="w-[22%]">Tên dự án</th>
+                                    <th className="w-[22%]">Hợp đồng / KH</th>
+                                    <th className="w-[12%]">Trạng thái</th>
+                                    <th className="w-[20%]">Tiến độ</th>
+                                    <th className="w-[12%]">Phụ trách</th>
+                                    <th className="text-right w-[8%]">...</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {projects.map((project) => (
                                     <tr key={project.id}>
                                         <td>{getTypeIcon(project.type)}</td>
-                                        <td className="font-medium text-slate-900">
+                                        <td className="font-medium text-slate-900 truncate" title={project.name}>
                                             {project.name}
                                         </td>
-                                        <td>
-                                            <div className="flex flex-col">
-                                                <span className="text-slate-900">{project.contract?.name}</span>
-                                                <span className="text-xs text-slate-500">
+                                        <td title={`${project.contract?.name || ""} - ${project.contract?.client?.name || ""}`}>
+                                            <div className="flex flex-col overflow-hidden">
+                                                <span className="text-slate-900 truncate">{project.contract?.name}</span>
+                                                <span className="text-xs text-slate-500 truncate">
                                                     {project.contract?.client?.name}
                                                 </span>
                                             </div>
@@ -366,7 +366,7 @@ export default function ProjectsPage() {
                                         <td>
                                             <ProgressBar project={project} />
                                         </td>
-                                        <td className="font-medium text-slate-900">
+                                        <td className="font-medium text-slate-900 truncate" title={project.assignee?.full_name || ""}>
                                             {project.assignee?.full_name || "—"}
                                         </td>
                                         <td>

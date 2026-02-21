@@ -230,17 +230,17 @@ function ContractsContent() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Tên hợp đồng</th>
-                                    <th>Khách hàng</th>
-                                    <th>Ngày ký</th>
-                                    <th className="text-right">Giá trị</th>
-                                    <th className="text-right w-24">Thao tác</th>
+                                    <th className="w-[40%]">Tên hợp đồng</th>
+                                    <th className="w-[25%]">Khách hàng</th>
+                                    <th className="w-[12%]">Ngày ký</th>
+                                    <th className="text-right w-[13%]">Giá trị</th>
+                                    <th className="text-right w-[10%]">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {contracts.map((contract) => (
                                     <tr key={contract.id}>
-                                        <td className="font-medium text-slate-900">
+                                        <td className="font-medium text-slate-900 truncate" title={contract.name}>
                                             <Link
                                                 href={`/contracts/${contract.id}`}
                                                 className="hover:text-primary-600 transition-colors"
@@ -248,8 +248,8 @@ function ContractsContent() {
                                                 {contract.name}
                                             </Link>
                                         </td>
-                                        <td>{contract.client?.name || "—"}</td>
-                                        <td>{formatDate(contract.signed_date)}</td>
+                                        <td className="truncate" title={contract.client?.name || ""}>{contract.client?.name || "—"}</td>
+                                        <td className="whitespace-nowrap">{formatDate(contract.signed_date)}</td>
                                         <td className="text-right font-medium text-primary-600">
                                             {formatCurrency(contract.total_value)}
                                         </td>

@@ -304,33 +304,33 @@ export default function TransactionsPage() {
                             <table className="table">
                                 <thead>
                                     <tr>
-                                        <th>Ngày</th>
-                                        <th>Đối tác</th>
-                                        <th>Hình thức</th>
-                                        <th>Nội dung</th>
-                                        <th className="text-right">Số tiền</th>
-                                        <th className="text-right w-16">...</th>
+                                        <th className="w-[12%]">Ngày</th>
+                                        <th className="w-[22%]">Đối tác</th>
+                                        <th className="w-[20%]">Hình thức</th>
+                                        <th className="w-[26%]">Nội dung</th>
+                                        <th className="text-right w-[14%]">Số tiền</th>
+                                        <th className="text-right w-[6%]">...</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {transactions.map((t) => (
                                         <tr key={t.id}>
                                             <td className="whitespace-nowrap">{formatDate(t.transaction_date)}</td>
-                                            <td className="font-medium">{t.partner?.name}</td>
+                                            <td className="font-medium truncate" title={t.partner?.name || ""}>{t.partner?.name}</td>
                                             <td>
                                                 {t.contract_id ? (
-                                                    <span className="inline-flex items-center gap-1 text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded-full font-medium">
-                                                        <FileSignature className="w-3 h-3" />
-                                                        {t.contract?.name || "HĐ"}
+                                                    <span className="inline-flex items-center gap-1 text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded-full font-medium" title={t.contract?.name || "HĐ"}>
+                                                        <FileSignature className="w-3 h-3 shrink-0" />
+                                                        <span className="truncate">{t.contract?.name || "HĐ"}</span>
                                                     </span>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1 text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">
-                                                        <Wallet className="w-3 h-3" />
+                                                        <Wallet className="w-3 h-3 shrink-0" />
                                                         Khác
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="max-w-[200px] truncate text-sm" title={t.description || ""}>
+                                            <td className="truncate text-sm" title={t.description || ""}>
                                                 {t.description || "—"}
                                             </td>
                                             <td className={`text-right font-bold ${activeTab === "RECEIPT" ? "text-green-600" : "text-red-600"}`}>

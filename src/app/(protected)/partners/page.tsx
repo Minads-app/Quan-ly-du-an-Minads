@@ -207,8 +207,8 @@ export default function PartnersPage() {
                                         </h3>
                                         <span
                                             className={`inline-block mt-1 ${partner.type === "Client"
-                                                    ? "badge-sent"
-                                                    : "badge-warning"
+                                                ? "badge-sent"
+                                                : "badge-warning"
                                                 }`}
                                         >
                                             {typeLabels[partner.type]}
@@ -258,18 +258,18 @@ export default function PartnersPage() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Tên đối tác</th>
-                                    <th>Loại</th>
-                                    <th>Số điện thoại</th>
-                                    <th>Địa chỉ</th>
-                                    <th>Mã số thuế</th>
-                                    <th className="text-right">Thao tác</th>
+                                    <th className="w-[30%]">Tên đối tác</th>
+                                    <th className="w-[12%]">Loại</th>
+                                    <th className="w-[14%]">Số điện thoại</th>
+                                    <th className="w-[24%]">Địa chỉ</th>
+                                    <th className="w-[12%]">Mã số thuế</th>
+                                    <th className="text-right w-[8%]">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {partners.map((partner) => (
                                     <tr key={partner.id}>
-                                        <td className="font-medium text-slate-900">
+                                        <td className="font-medium text-slate-900 truncate" title={partner.name}>
                                             {partner.name}
                                         </td>
                                         <td>
@@ -284,7 +284,7 @@ export default function PartnersPage() {
                                             </span>
                                         </td>
                                         <td>{partner.phone || "—"}</td>
-                                        <td className="max-w-[200px] truncate">
+                                        <td className="truncate" title={partner.address || ""}>
                                             {partner.address || "—"}
                                         </td>
                                         <td>{partner.tax_code || "—"}</td>

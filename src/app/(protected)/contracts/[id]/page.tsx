@@ -21,8 +21,15 @@ import ContractCostModal from "@/components/modules/contracts/ContractCostModal"
 import TransactionModal from "@/components/modules/contracts/TransactionModal";
 import type { Contract, ContractCost, Transaction } from "@/types/database";
 
+interface CostDebtInfo {
+    id: string;
+    total_amount: number;
+    paid_amount: number;
+}
+
 interface ContractCostRow extends ContractCost {
     supplier: { name: string } | null;
+    debt: CostDebtInfo | null;
 }
 
 interface TransactionRow extends Transaction {
@@ -119,9 +126,30 @@ export default function ContractDetail() {
             .order("created_at", { ascending: false });
 
         if (data) {
+            // Fetch debts linked to these costs
+            const costIds = data.map((c: any) => c.id);
+            const { data: debts } = await supabase
+                .from("debts")
+                .select("id, total_amount, paid_amount, contract_cost_id")
+                .in("contract_cost_id", costIds);
+
+            const debtMap = new Map<string, CostDebtInfo>();
+            if (debts) {
+                debts.forEach((d: any) => {
+                    if (d.contract_cost_id) {
+                        debtMap.set(d.contract_cost_id, {
+                            id: d.id,
+                            total_amount: d.total_amount,
+                            paid_amount: d.paid_amount,
+                        });
+                    }
+                });
+            }
+
             const fixedData = data.map((item: any) => ({
                 ...item,
                 supplier: Array.isArray(item.supplier) ? item.supplier[0] : item.supplier,
+                debt: debtMap.get(item.id) || null,
             }));
             setCosts(fixedData as ContractCostRow[]);
         }
@@ -549,9 +577,23 @@ export default function ContractDetail() {
                                                     <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
                                                         <LinkIcon className="w-3 h-3" />
                                                         {cost.supplier.name}
-                                                        <span className="badge bg-emerald-50 text-emerald-600 text-[10px]">→ Phải trả</span>
                                                     </div>
                                                 )}
+                                                {cost.debt ? (
+                                                    <div className="mt-1">
+                                                        {cost.debt.paid_amount >= cost.debt.total_amount ? (
+                                                            <span className="badge bg-green-50 text-green-700 text-[10px]">✅ Đã thanh toán</span>
+                                                        ) : cost.debt.paid_amount > 0 ? (
+                                                            <span className="badge bg-amber-50 text-amber-700 text-[10px]">⏳ TT {formatCurrency(cost.debt.paid_amount)}/{formatCurrency(cost.debt.total_amount)}</span>
+                                                        ) : (
+                                                            <span className="badge bg-red-50 text-red-600 text-[10px]">❌ Chưa thanh toán</span>
+                                                        )}
+                                                    </div>
+                                                ) : cost.supplier ? (
+                                                    <div className="mt-1">
+                                                        <span className="badge bg-red-50 text-red-600 text-[10px]">❌ Chưa thanh toán</span>
+                                                    </div>
+                                                ) : null}
                                             </div>
                                             <span className="font-bold text-slate-900">
                                                 {formatCurrency(cost.amount)}
@@ -587,7 +629,7 @@ export default function ContractDetail() {
                                             <th>Mô tả</th>
                                             <th>Nhà cung cấp</th>
                                             <th className="text-right">Số tiền</th>
-                                            <th className="text-center w-24">Công nợ</th>
+                                            <th className="text-center w-24">Thanh toán</th>
                                             <th className="text-right w-24">Thao tác</th>
                                         </tr>
                                     </thead>
@@ -607,10 +649,19 @@ export default function ContractDetail() {
                                                     {formatCurrency(cost.amount)}
                                                 </td>
                                                 <td className="text-center">
-                                                    {cost.supplier ? (
-                                                        <span className="badge bg-emerald-50 text-emerald-600 text-xs">
-                                                            → Phải trả
-                                                        </span>
+                                                    {cost.debt ? (
+                                                        cost.debt.paid_amount >= cost.debt.total_amount ? (
+                                                            <span className="badge bg-green-50 text-green-700 text-xs">✅ Đã TT</span>
+                                                        ) : cost.debt.paid_amount > 0 ? (
+                                                            <div>
+                                                                <span className="badge bg-amber-50 text-amber-700 text-xs">⏳ TT 1 phần</span>
+                                                                <p className="text-[10px] text-slate-500 mt-0.5">{formatCurrency(cost.debt.paid_amount)}/{formatCurrency(cost.debt.total_amount)}</p>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="badge bg-red-50 text-red-600 text-xs">❌ Chưa TT</span>
+                                                        )
+                                                    ) : cost.supplier ? (
+                                                        <span className="badge bg-red-50 text-red-600 text-xs">❌ Chưa TT</span>
                                                     ) : (
                                                         <span className="text-slate-300">—</span>
                                                     )}

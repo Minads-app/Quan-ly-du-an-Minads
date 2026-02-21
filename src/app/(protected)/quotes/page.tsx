@@ -253,12 +253,12 @@ export default function QuotesPage() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Khách hàng</th>
-                                    <th>Trạng thái</th>
-                                    <th className="text-right">Tổng tiền</th>
-                                    <th>Ngày tạo</th>
-                                    <th>Người tạo</th>
-                                    <th className="text-right">Thao tác</th>
+                                    <th className="w-[35%]">Khách hàng</th>
+                                    <th className="w-[12%]">Trạng thái</th>
+                                    <th className="text-right w-[15%]">Tổng tiền</th>
+                                    <th className="w-[12%]">Ngày tạo</th>
+                                    <th className="w-[15%]">Người tạo</th>
+                                    <th className="text-right w-[11%]">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -266,17 +266,17 @@ export default function QuotesPage() {
                                     const sc = statusConfig[quote.status] || statusConfig.Draft;
                                     return (
                                         <tr key={quote.id}>
-                                            <td className="font-medium text-slate-900">
+                                            <td className="font-medium text-slate-900 truncate" title={quote.client?.name || ""}>
                                                 {quote.client?.name || "—"}
                                             </td>
                                             <td>
                                                 <span className={sc.badge}>{sc.label}</span>
                                             </td>
-                                            <td className="text-right font-medium text-primary-600">
+                                            <td className="text-right font-medium text-primary-600 whitespace-nowrap">
                                                 {formatCurrency(quote.total_amount)}
                                             </td>
-                                            <td>{formatDate(quote.created_at)}</td>
-                                            <td className="text-slate-500">
+                                            <td className="whitespace-nowrap">{formatDate(quote.created_at)}</td>
+                                            <td className="text-slate-500 truncate" title={quote.creator?.full_name || quote.creator?.email || ""}>
                                                 {quote.creator?.full_name || quote.creator?.email || "—"}
                                             </td>
                                             <td>

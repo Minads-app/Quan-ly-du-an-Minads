@@ -270,7 +270,6 @@ export default function TransactionModal({
                         .limit(1);
 
                     if (existingDebts && existingDebts.length > 0) {
-                        // Update existing debt
                         const debt = existingDebts[0];
                         debtId = debt.id;
                         await supabase
@@ -290,7 +289,6 @@ export default function TransactionModal({
                         if (oldDebts && oldDebts.length > 0) {
                             const debt = oldDebts[0];
                             debtId = debt.id;
-                            // Link old debt to contract + update
                             await supabase
                                 .from("debts")
                                 .update({
@@ -315,22 +313,59 @@ export default function TransactionModal({
                             if (newDebt) debtId = newDebt.id;
                         }
                     }
-                } else if (type === "PAYMENT" && selectedCostId) {
-                    // Find PAYABLE debt linked to this contract_cost
-                    const { data: costDebts } = await supabase
-                        .from("debts")
-                        .select("id, paid_amount")
-                        .eq("contract_cost_id", selectedCostId)
-                        .eq("type", "PAYABLE")
-                        .limit(1);
+                } else if (type === "PAYMENT") {
+                    let costId = selectedCostId;
 
-                    if (costDebts && costDebts.length > 0) {
-                        const debt = costDebts[0];
-                        debtId = debt.id;
-                        await supabase
+                    // If no cost selected, auto-create a contract_cost entry
+                    if (!costId) {
+                        const { data: newCost } = await supabase
+                            .from("contract_costs")
+                            .insert({
+                                contract_id: selectedContract.id,
+                                cost_category: "KHAC",
+                                supplier_id: data.partner_id || null,
+                                amount: data.amount,
+                                description: data.description || "Chi phí từ phiếu chi",
+                            })
+                            .select("id")
+                            .single();
+
+                        if (newCost) {
+                            costId = newCost.id;
+                            // Auto-create PAYABLE debt
+                            if (data.partner_id) {
+                                const { data: newDebt } = await supabase
+                                    .from("debts")
+                                    .insert({
+                                        partner_id: data.partner_id,
+                                        type: "PAYABLE" as const,
+                                        total_amount: data.amount,
+                                        paid_amount: data.amount,
+                                        contract_cost_id: newCost.id,
+                                        notes: `Chi phí HĐ: ${selectedContract.name} - ${data.description || "Khác"}`,
+                                    })
+                                    .select("id")
+                                    .single();
+                                if (newDebt) debtId = newDebt.id;
+                            }
+                        }
+                    } else {
+                        // Find PAYABLE debt linked to this contract_cost
+                        const { data: costDebts } = await supabase
                             .from("debts")
-                            .update({ paid_amount: debt.paid_amount + data.amount })
-                            .eq("id", debt.id);
+                            .select("id, paid_amount")
+                            .eq("contract_cost_id", costId)
+                            .eq("type", "PAYABLE")
+                            .limit(1);
+
+                        if (costDebts && costDebts.length > 0) {
+                            const debt = costDebts[0];
+                            debtId = debt.id;
+                            await supabase
+                                .from("debts")
+                                .update({ paid_amount: debt.paid_amount + data.amount })
+                                .eq("id", debt.id);
+                        }
                     }
                 }
             } else if (mode === "general" && data.debt_id) {

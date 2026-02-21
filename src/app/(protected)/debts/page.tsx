@@ -233,13 +233,13 @@ export default function DebtsPage() {
                         <table className="table">
                             <thead>
                                 <tr>
-                                    <th>Đối tác</th>
-                                    <th className="text-right">Tổng tiền</th>
-                                    <th className="text-right">Đã trả</th>
-                                    <th className="text-right">Còn lại</th>
-                                    <th>Tiến độ</th>
-                                    <th>Hạn thanh toán</th>
-                                    <th className="text-right w-24">...</th>
+                                    <th className="w-[22%]">Đối tác</th>
+                                    <th className="text-right w-[14%]">Tổng tiền</th>
+                                    <th className="text-right w-[14%]">Đã trả</th>
+                                    <th className="text-right w-[14%]">Còn lại</th>
+                                    <th className="w-[12%]">Tiến độ</th>
+                                    <th className="w-[14%]">Hạn thanh toán</th>
+                                    <th className="text-right w-[10%]">...</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -252,14 +252,14 @@ export default function DebtsPage() {
 
                                     return (
                                         <tr key={debt.id}>
-                                            <td className="font-medium">
-                                                <div className="flex items-center gap-2">
-                                                    {debt.partner?.name}
+                                            <td className="font-medium" title={debt.partner?.name || ""}>
+                                                <div className="flex items-center gap-1 overflow-hidden">
+                                                    <span className="truncate">{debt.partner?.name}</span>
                                                     {(debt as any).contract_cost_id && (
-                                                        <span className="badge bg-emerald-50 text-emerald-600 text-[10px]">Từ CP Hợp đồng</span>
+                                                        <span className="badge bg-emerald-50 text-emerald-600 text-[10px] shrink-0">CP HĐ</span>
                                                     )}
-                                                    {(debt as any).contract_id && (
-                                                        <span className="badge bg-blue-50 text-blue-600 text-[10px]">Từ Hợp đồng</span>
+                                                    {(debt as any).contract_id && !(debt as any).contract_cost_id && (
+                                                        <span className="badge bg-blue-50 text-blue-600 text-[10px] shrink-0">HĐ</span>
                                                     )}
                                                 </div>
                                             </td>
@@ -270,14 +270,14 @@ export default function DebtsPage() {
                                             <td className="text-right text-red-600 font-bold">
                                                 {formatCurrency(remaining)}
                                             </td>
-                                            <td className="w-32">
+                                            <td className="w-28">
                                                 <div className="w-full bg-slate-200 rounded-full h-2">
                                                     <div
                                                         className={`h-2 rounded-full ${getProgressColor(percent)}`}
                                                         style={{ width: `${Math.min(percent, 100)}%` }}
                                                     />
                                                 </div>
-                                                <span className="text-xs text-slate-500 mt-1 block text-center">
+                                                <span className="text-xs text-slate-500 mt-0.5 block text-center">
                                                     {percent.toFixed(0)}%
                                                 </span>
                                             </td>
