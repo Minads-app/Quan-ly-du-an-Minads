@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
     Plus,
@@ -12,6 +12,7 @@ import {
     FileText,
     Loader2,
     FileDown,
+    MoreHorizontal,
 } from "lucide-react";
 import Link from "next/link";
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
@@ -36,6 +37,21 @@ export default function QuotesPage() {
     const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
     const [deleteQuote, setDeleteQuote] = useState<QuoteRow | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdown on click outside
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setOpenMenuId(null);
+            }
+        }
+        if (openMenuId) {
+            document.addEventListener("mousedown", handleClickOutside);
+            return () => document.removeEventListener("mousedown", handleClickOutside);
+        }
+    }, [openMenuId]);
 
     const fetchQuotes = useCallback(async () => {
         setLoading(true);
@@ -258,7 +274,7 @@ export default function QuotesPage() {
                                     <th className="text-right w-[15%]">Tổng tiền</th>
                                     <th className="w-[12%]">Ngày tạo</th>
                                     <th className="w-[15%]">Người tạo</th>
-                                    <th className="text-right w-[11%]">Thao tác</th>
+                                    <th className="text-right w-[6%]"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -279,36 +295,50 @@ export default function QuotesPage() {
                                             <td className="text-slate-500 truncate" title={quote.creator?.full_name || quote.creator?.email || ""}>
                                                 {quote.creator?.full_name || quote.creator?.email || "—"}
                                             </td>
-                                            <td>
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Link
-                                                        href={`/quotes/${quote.id}`}
-                                                        className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-primary-600 transition-colors"
-                                                        title="Xem"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </Link>
-                                                    <Link
-                                                        href={`/quotes/${quote.id}/edit`}
-                                                        className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-primary-600 transition-colors"
-                                                        title="Sửa"
-                                                    >
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </Link>
-                                                    <Link
-                                                        href={`/quotes/${quote.id}/pdf`}
-                                                        className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-green-600 transition-colors"
-                                                        title="Xuất PDF"
-                                                    >
-                                                        <FileDown className="w-4 h-4" />
-                                                    </Link>
+                                            <td className="relative">
+                                                <div className="flex justify-end" ref={openMenuId === quote.id ? menuRef : undefined}>
                                                     <button
-                                                        onClick={() => setDeleteQuote(quote)}
-                                                        className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                                                        title="Xóa"
+                                                        onClick={() => setOpenMenuId(openMenuId === quote.id ? null : quote.id)}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <MoreHorizontal className="w-4 h-4" />
                                                     </button>
+                                                    {openMenuId === quote.id && (
+                                                        <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+                                                            <Link
+                                                                href={`/quotes/${quote.id}`}
+                                                                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                                                onClick={() => setOpenMenuId(null)}
+                                                            >
+                                                                <Eye className="w-4 h-4 text-slate-400" />
+                                                                Xem
+                                                            </Link>
+                                                            <Link
+                                                                href={`/quotes/${quote.id}/edit`}
+                                                                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                                                onClick={() => setOpenMenuId(null)}
+                                                            >
+                                                                <Edit2 className="w-4 h-4 text-slate-400" />
+                                                                Sửa
+                                                            </Link>
+                                                            <Link
+                                                                href={`/quotes/${quote.id}/pdf`}
+                                                                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                                                onClick={() => setOpenMenuId(null)}
+                                                            >
+                                                                <FileDown className="w-4 h-4 text-green-500" />
+                                                                Xuất PDF
+                                                            </Link>
+                                                            <div className="border-t border-slate-100 my-1" />
+                                                            <button
+                                                                onClick={() => { setDeleteQuote(quote); setOpenMenuId(null); }}
+                                                                className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors w-full"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                                Xóa
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

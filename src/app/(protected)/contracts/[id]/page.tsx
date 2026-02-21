@@ -904,11 +904,11 @@ export default function ContractDetail() {
                                                     <table className="table min-w-full">
                                                         <thead>
                                                             <tr>
-                                                                <th className="w-10 text-center">STT</th>
-                                                                <th className="w-[35%]">Hạng mục / Dịch vụ</th>
+                                                                <th className="w-8 text-center">STT</th>
+                                                                <th>Hạng mục / Dịch vụ</th>
                                                                 <th className="text-center w-16">ĐVT</th>
                                                                 <th className="text-right w-16">SL</th>
-                                                                <th className="text-right">Đơn giá</th>
+                                                                <th className="text-right w-40">Đơn giá</th>
                                                                 <th className="text-right w-14">CK(%)</th>
                                                                 <th className="text-right">Thành tiền</th>
                                                             </tr>
@@ -984,8 +984,8 @@ export default function ContractDetail() {
                                                     <table className="table min-w-full">
                                                         <thead>
                                                             <tr className="bg-slate-50">
-                                                                <th className="w-10 text-center text-slate-500">STT</th>
-                                                                <th className="w-[35%] text-slate-500">Hạng mục / Dịch vụ</th>
+                                                                <th className="w-8 text-center text-slate-500">STT</th>
+                                                                <th className="text-slate-500">Hạng mục / Dịch vụ</th>
                                                                 <th className="text-center w-16 text-slate-500">ĐVT</th>
                                                                 <th className="text-right w-16 text-slate-500">SL</th>
                                                                 <th className="text-right text-slate-500">Đơn giá</th>
