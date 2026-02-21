@@ -106,7 +106,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                                 Minads
                             </h1>
                             <p className="text-[10px] uppercase font-semibold text-slate-400 truncate tracking-wider">
-                                Project Manager
+                                Quản lý dự án
                             </p>
                         </div>
                     )}
