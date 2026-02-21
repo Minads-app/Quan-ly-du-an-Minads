@@ -653,12 +653,12 @@ export default function ContractDetail() {
                                     <table className="table">
                                         <thead>
                                             <tr>
-                                                <th>Loại</th>
-                                                <th>Mô tả</th>
-                                                <th>Nhà cung cấp</th>
-                                                <th className="text-right">Số tiền</th>
-                                                <th className="text-center w-24">Thanh toán</th>
-                                                <th className="text-right w-24">Thao tác</th>
+                                                <th className="w-[10%]">Loại</th>
+                                                <th className="w-[25%]">Mô tả</th>
+                                                <th className="w-[18%]">Nhà cung cấp</th>
+                                                <th className="text-right w-[17%] whitespace-nowrap">Số tiền</th>
+                                                <th className="text-center w-[18%]">Thanh toán</th>
+                                                <th className="text-right w-[12%]">Thao tác</th>
                                             </tr>
                                         </thead>
                                         <tbody>
