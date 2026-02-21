@@ -73,6 +73,7 @@ export interface Contract {
     client_id: string;
     name: string;
     total_value: number;
+    vat_rate: number;
     signed_date: string | null;
     notes: string | null;
     created_at: string;

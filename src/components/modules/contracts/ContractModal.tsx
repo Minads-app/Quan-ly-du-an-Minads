@@ -41,6 +41,7 @@ export default function ContractModal({
     const [loading, setLoading] = useState(false);
     const [clients, setClients] = useState<Partner[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [vatRate, setVatRate] = useState<number>(0);
 
     const isEditing = !!contract && !!contract.id;
 
@@ -90,7 +91,7 @@ export default function ContractModal({
 
             let query = supabase
                 .from("quotes")
-                .select("id, total_amount, client_id, status")
+                .select("id, total_amount, vat_rate, client_id, status")
                 .order("created_at", { ascending: false });
 
             // Only fetch unused quotes, unless we're editing an existing contract
@@ -120,6 +121,7 @@ export default function ContractModal({
             if (quote) {
                 setValue("client_id", quote.client_id || "");
                 setValue("total_value", quote.total_amount || 0);
+                setVatRate(Number(quote.vat_rate) || 0);
                 if (!watch("name")) {
                     const client = clients.find(c => c.id === quote.client_id);
                     if (client) {
@@ -137,6 +139,7 @@ export default function ContractModal({
                 setValue("client_id", contract.client_id);
                 setValue("quote_id", contract.quote_id || "");
                 setValue("total_value", contract.total_value);
+                setVatRate(contract.vat_rate || 0);
                 setValue(
                     "signed_date",
                     contract.signed_date ? contract.signed_date.split("T")[0] : ""
@@ -151,6 +154,7 @@ export default function ContractModal({
                     signed_date: new Date().toISOString().split("T")[0],
                     notes: "",
                 });
+                setVatRate(0);
             }
             setError(null);
         }
@@ -165,6 +169,7 @@ export default function ContractModal({
             client_id: data.client_id,
             quote_id: data.quote_id,
             total_value: data.total_value,
+            vat_rate: vatRate,
             signed_date: data.signed_date || null,
             notes: data.notes || null,
         };

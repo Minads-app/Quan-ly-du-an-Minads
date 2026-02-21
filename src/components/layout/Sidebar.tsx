@@ -11,6 +11,7 @@ import {
     FolderKanban,
     Wallet,
     Receipt,
+    BarChart3,
     ChevronLeft,
     ChevronRight,
     Settings,
@@ -42,6 +43,12 @@ const navItems: NavItem[] = [
         label: "Thu chi",
         href: "/transactions",
         icon: Receipt,
+        roles: ["Admin", "Accountant"],
+    },
+    {
+        label: "Báo cáo",
+        href: "/reports",
+        icon: BarChart3,
         roles: ["Admin", "Accountant"],
     },
     {
