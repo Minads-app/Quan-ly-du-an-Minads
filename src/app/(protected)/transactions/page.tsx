@@ -11,6 +11,8 @@ import {
     TrendingDown,
     Wallet,
     Calendar,
+    FileSignature,
+    Filter,
 } from "lucide-react";
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
 import TransactionModal from "@/components/modules/contracts/TransactionModal";
@@ -21,33 +23,37 @@ interface TransactionRow extends Transaction {
     contract: { name: string } | null;
 }
 
+type SourceFilter = "all" | "contract" | "general";
+
 export default function TransactionsPage() {
     const supabase = createClient();
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<TransactionRow[]>([]);
 
     const [activeTab, setActiveTab] = useState<TransactionType>("RECEIPT");
+    const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
     const [searchQuery, setSearchQuery] = useState("");
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [deleteItem, setDeleteItem] = useState<TransactionRow | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    // Stats
-    const totalReceipt = transactions
-        .filter(() => activeTab === "RECEIPT")
-        .reduce((sum, t) => sum + t.amount, 0);
-    const totalPayment = transactions
-        .filter(() => activeTab === "PAYMENT")
-        .reduce((sum, t) => sum + t.amount, 0);
-
     const fetchTransactions = useCallback(async () => {
         setLoading(true);
-        const { data, error } = await supabase
+        let query = supabase
             .from("transactions")
             .select("*, partner:partners!partner_id(name), contract:contracts!contract_id(name)")
             .eq("type", activeTab)
             .order("transaction_date", { ascending: false });
+
+        // Apply source filter
+        if (sourceFilter === "contract") {
+            query = query.not("contract_id", "is", null);
+        } else if (sourceFilter === "general") {
+            query = query.is("contract_id", null);
+        }
+
+        const { data, error } = await query;
 
         if (!error && data) {
             const fixedData = data.map((item: any) => ({
@@ -70,7 +76,7 @@ export default function TransactionsPage() {
             setTransactions(result);
         }
         setLoading(false);
-    }, [supabase, activeTab, searchQuery]);
+    }, [supabase, activeTab, sourceFilter, searchQuery]);
 
     useEffect(() => {
         fetchTransactions();
@@ -118,6 +124,8 @@ export default function TransactionsPage() {
     }
 
     const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
+    const contractCount = transactions.filter(t => t.contract_id).length;
+    const generalCount = transactions.filter(t => !t.contract_id).length;
 
     return (
         <div className="animate-fade-in space-y-6">
@@ -140,7 +148,7 @@ export default function TransactionsPage() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="stat-card">
                     <div className="flex items-center gap-3 mb-2">
                         <div className={`p-2 rounded-lg ${activeTab === "RECEIPT" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}>
@@ -157,40 +165,71 @@ export default function TransactionsPage() {
 
                 <div className="stat-card">
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+                        <div className="p-2 rounded-lg bg-primary-50 text-primary-600">
+                            <FileSignature className="w-5 h-5" />
+                        </div>
+                        <span className="text-sm font-medium text-slate-500">Theo HĐ</span>
+                    </div>
+                    <div className="text-2xl font-bold text-slate-900">{contractCount}</div>
+                </div>
+
+                <div className="stat-card">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 rounded-lg bg-orange-50 text-orange-600">
                             <Wallet className="w-5 h-5" />
                         </div>
-                        <span className="text-sm font-medium text-slate-500">
-                            Số phiếu
-                        </span>
+                        <span className="text-sm font-medium text-slate-500">Thu chi khác</span>
                     </div>
-                    <div className="text-2xl font-bold text-slate-900">
-                        {transactions.length}
-                    </div>
+                    <div className="text-2xl font-bold text-slate-900">{generalCount}</div>
                 </div>
             </div>
 
             {/* Tabs & Filters */}
             <div className="card p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="flex bg-slate-100 p-1 rounded-lg">
-                    <button
-                        onClick={() => setActiveTab("RECEIPT")}
-                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === "RECEIPT"
-                            ? "bg-white text-green-700 shadow-sm"
-                            : "text-slate-600 hover:text-slate-900"
-                            }`}
-                    >
-                        Phiếu thu
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("PAYMENT")}
-                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === "PAYMENT"
-                            ? "bg-white text-red-700 shadow-sm"
-                            : "text-slate-600 hover:text-slate-900"
-                            }`}
-                    >
-                        Phiếu chi
-                    </button>
+                <div className="flex gap-2 flex-wrap">
+                    {/* Type tabs */}
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => setActiveTab("RECEIPT")}
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === "RECEIPT"
+                                ? "bg-white text-green-700 shadow-sm"
+                                : "text-slate-600 hover:text-slate-900"
+                                }`}
+                        >
+                            Phiếu thu
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("PAYMENT")}
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === "PAYMENT"
+                                ? "bg-white text-red-700 shadow-sm"
+                                : "text-slate-600 hover:text-slate-900"
+                                }`}
+                        >
+                            Phiếu chi
+                        </button>
+                    </div>
+
+                    {/* Source filter */}
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => setSourceFilter("all")}
+                            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${sourceFilter === "all" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"}`}
+                        >
+                            Tất cả
+                        </button>
+                        <button
+                            onClick={() => setSourceFilter("contract")}
+                            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${sourceFilter === "contract" ? "bg-white text-primary-700 shadow-sm" : "text-slate-500"}`}
+                        >
+                            Theo HĐ
+                        </button>
+                        <button
+                            onClick={() => setSourceFilter("general")}
+                            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${sourceFilter === "general" ? "bg-white text-orange-700 shadow-sm" : "text-slate-500"}`}
+                        >
+                            Thu chi khác
+                        </button>
+                    </div>
                 </div>
 
                 <div className="relative w-full md:w-72">
@@ -212,7 +251,8 @@ export default function TransactionsPage() {
                 </div>
             ) : transactions.length === 0 ? (
                 <div className="card p-12 text-center text-slate-500">
-                    Chưa có {activeTab === "RECEIPT" ? "phiếu thu" : "phiếu chi"} nào.
+                    Chưa có {activeTab === "RECEIPT" ? "phiếu thu" : "phiếu chi"} nào
+                    {sourceFilter !== "all" && (sourceFilter === "contract" ? " theo hợp đồng" : " thu chi khác")}.
                 </div>
             ) : (
                 <>
@@ -223,10 +263,16 @@ export default function TransactionsPage() {
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
                                         <p className="font-semibold text-slate-900">{t.partner?.name}</p>
-                                        {t.contract && (
-                                            <p className="text-xs text-slate-500 mt-0.5">
-                                                HĐ: {t.contract.name}
-                                            </p>
+                                        {t.contract ? (
+                                            <span className="inline-flex items-center gap-1 mt-1 text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">
+                                                <FileSignature className="w-3 h-3" />
+                                                {t.contract.name}
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 mt-1 text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full">
+                                                <Wallet className="w-3 h-3" />
+                                                Thu chi khác
+                                            </span>
                                         )}
                                     </div>
                                     <span className={`text-lg font-bold ${activeTab === "RECEIPT" ? "text-green-600" : "text-red-600"}`}>
@@ -260,7 +306,7 @@ export default function TransactionsPage() {
                                     <tr>
                                         <th>Ngày</th>
                                         <th>Đối tác</th>
-                                        <th>Hợp đồng</th>
+                                        <th>Hình thức</th>
                                         <th>Nội dung</th>
                                         <th className="text-right">Số tiền</th>
                                         <th className="text-right w-16">...</th>
@@ -271,7 +317,19 @@ export default function TransactionsPage() {
                                         <tr key={t.id}>
                                             <td className="whitespace-nowrap">{formatDate(t.transaction_date)}</td>
                                             <td className="font-medium">{t.partner?.name}</td>
-                                            <td className="text-sm text-slate-500">{t.contract?.name || "—"}</td>
+                                            <td>
+                                                {t.contract_id ? (
+                                                    <span className="inline-flex items-center gap-1 text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded-full font-medium">
+                                                        <FileSignature className="w-3 h-3" />
+                                                        {t.contract?.name || "HĐ"}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">
+                                                        <Wallet className="w-3 h-3" />
+                                                        Khác
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td className="max-w-[200px] truncate text-sm" title={t.description || ""}>
                                                 {t.description || "—"}
                                             </td>
