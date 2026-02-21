@@ -157,7 +157,7 @@ export default function ContractDetail() {
     }, [contractId, supabase]);
 
     useEffect(() => {
-        if (activeTab === "costs") {
+        if (activeTab === "overview" || activeTab === "costs") {
             fetchCosts();
         }
         if (activeTab === "payments") {
