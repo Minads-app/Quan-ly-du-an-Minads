@@ -905,7 +905,7 @@ export default function ContractDetail() {
                                                         <thead>
                                                             <tr>
                                                                 <th className="w-8 text-center">STT</th>
-                                                                <th>Hạng mục / Dịch vụ</th>
+                                                                <th className="text-center">Hạng mục / Dịch vụ</th>
                                                                 <th className="text-center w-16">ĐVT</th>
                                                                 <th className="text-right w-16">SL</th>
                                                                 <th className="text-right w-40">Đơn giá</th>
