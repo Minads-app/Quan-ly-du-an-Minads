@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginFormData } from "@/lib/validators";
@@ -14,6 +14,30 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
+    // Login throttling — khóa sau 5 lần thất bại
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_SECONDS = 30;
+    const [failedAttempts, setFailedAttempts] = useState(0);
+    const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+    const [lockoutRemaining, setLockoutRemaining] = useState(0);
+
+    // Countdown timer cho lockout
+    useEffect(() => {
+        if (!lockoutUntil) return;
+        const interval = setInterval(() => {
+            const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+            if (remaining <= 0) {
+                setLockoutUntil(null);
+                setLockoutRemaining(0);
+            } else {
+                setLockoutRemaining(remaining);
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [lockoutUntil]);
+
+    const isLockedOut = lockoutUntil !== null && Date.now() < lockoutUntil;
+
     const {
         register,
         handleSubmit,
@@ -23,6 +47,11 @@ export default function LoginPage() {
     });
 
     async function onSubmit(data: LoginFormData) {
+        if (isLockedOut) {
+            setError(`Vui lòng đợi ${lockoutRemaining} giây trước khi thử lại`);
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
@@ -34,15 +63,29 @@ export default function LoginPage() {
         });
 
         if (authError) {
-            setError(
-                authError.message === "Invalid login credentials"
-                    ? "Email hoặc mật khẩu không đúng"
-                    : authError.message
-            );
+            const newAttempts = failedAttempts + 1;
+            setFailedAttempts(newAttempts);
+
+            if (newAttempts >= MAX_ATTEMPTS) {
+                const lockUntil = Date.now() + LOCKOUT_SECONDS * 1000;
+                setLockoutUntil(lockUntil);
+                setLockoutRemaining(LOCKOUT_SECONDS);
+                setFailedAttempts(0);
+                setError(`Quá nhiều lần thất bại. Vui lòng đợi ${LOCKOUT_SECONDS} giây.`);
+            } else {
+                setError(
+                    authError.message === "Invalid login credentials"
+                        ? `Email hoặc mật khẩu không đúng (${newAttempts}/${MAX_ATTEMPTS})`
+                        : authError.message
+                );
+            }
             setLoading(false);
             return;
         }
 
+        // Reset on success
+        setFailedAttempts(0);
+        setLockoutUntil(null);
         router.push("/dashboard");
         router.refresh();
     }
@@ -163,15 +206,22 @@ export default function LoginPage() {
                         {/* Submit */}
                         <button
                             type="submit"
-                            disabled={loading}
-                            className="btn-primary w-full py-3 text-base shadow-lg shadow-primary-500/30 hover:shadow-primary-500/40 hover:-translate-y-0.5 transition-all duration-200 mt-2"
+                            disabled={loading || isLockedOut}
+                            className={`btn-primary w-full py-3 text-base shadow-lg transition-all duration-200 mt-2 ${isLockedOut
+                                ? "opacity-50 cursor-not-allowed shadow-none"
+                                : "shadow-primary-500/30 hover:shadow-primary-500/40 hover:-translate-y-0.5"
+                                }`}
                         >
                             {loading ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />
                             ) : (
                                 <LogIn className="w-5 h-5" />
                             )}
-                            {loading ? "Đang xử lý..." : "Đăng nhập ngay"}
+                            {isLockedOut
+                                ? `Đợi ${lockoutRemaining}s...`
+                                : loading
+                                    ? "Đang xử lý..."
+                                    : "Đăng nhập ngay"}
                         </button>
                     </form>
                 </div>

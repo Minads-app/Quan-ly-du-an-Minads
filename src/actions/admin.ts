@@ -7,7 +7,10 @@ import { z } from "zod";
 
 const createUserSchema = z.object({
     email: z.string().email("Email không hợp lệ"),
-    password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
+    password: z.string()
+        .min(8, "Mật khẩu tối thiểu 8 ký tự")
+        .regex(/[A-Z]/, "Mật khẩu phải có ít nhất 1 chữ hoa")
+        .regex(/[0-9]/, "Mật khẩu phải có ít nhất 1 số"),
     fullName: z.string().min(1, "Vui lòng nhập họ tên"),
     role: z.enum(["Admin", "Accountant", "Employee"]),
 });

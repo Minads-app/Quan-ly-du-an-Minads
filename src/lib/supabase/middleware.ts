@@ -35,22 +35,14 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser();
 
-    // Protected routes - redirect to login if not authenticated
-    const protectedPaths = [
-        "/dashboard",
-        "/partners",
-        "/services",
-        "/quotes",
-        "/contracts",
-        "/projects",
-        "/debts",
-    ];
+    // Whitelist approach: chỉ các route public mới không cần auth
+    // Tất cả route khác đều yêu cầu đăng nhập
+    const publicPaths = ["/login"];
+    const isPublicRoute =
+        request.nextUrl.pathname === "/" ||
+        publicPaths.some((path) => request.nextUrl.pathname.startsWith(path));
 
-    const isProtectedRoute = protectedPaths.some((path) =>
-        request.nextUrl.pathname.startsWith(path)
-    );
-
-    if (isProtectedRoute && !user) {
+    if (!isPublicRoute && !user) {
         const url = request.nextUrl.clone();
         url.pathname = "/login";
         return NextResponse.redirect(url);
