@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
+import { toast } from "sonner";
 
 interface QuoteRow {
     id: string;
@@ -92,13 +93,22 @@ export default function QuotesPage() {
         if (!deleteQuote) return;
         setDeleting(true);
 
-        // Xóa quote_items trước, rồi xóa quote
-        await supabase.from("quote_items").delete().eq("quote_id", deleteQuote.id);
-        await supabase.from("quotes").delete().eq("id", deleteQuote.id);
+        try {
+            // Xóa quote_items trước, rồi xóa quote
+            const { error: itemsErr } = await supabase.from("quote_items").delete().eq("quote_id", deleteQuote.id);
+            if (itemsErr) throw new Error(itemsErr.message);
 
-        setQuotes((prev) => prev.filter((q) => q.id !== deleteQuote.id));
-        setDeleting(false);
-        setDeleteQuote(null);
+            const { error: quoteErr } = await supabase.from("quotes").delete().eq("id", deleteQuote.id);
+            if (quoteErr) throw new Error(quoteErr.message);
+
+            setQuotes((prev) => prev.filter((q) => q.id !== deleteQuote.id));
+            toast.success("Đã xóa báo giá thành công");
+        } catch (err: any) {
+            toast.error("Xóa báo giá thất bại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setDeleting(false);
+            setDeleteQuote(null);
+        }
     }
 
     function formatCurrency(amount: number) {

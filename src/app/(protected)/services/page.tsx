@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import ServiceModal from "@/components/modules/services/ServiceModal";
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
+import { toast } from "sonner";
 
 type FilterType = "all" | "Material" | "Labor" | "Service" | "Ads";
 
@@ -72,11 +73,18 @@ export default function ServicesPage() {
         if (!deleteService) return;
         setDeleting(true);
 
-        await supabase.from("services").delete().eq("id", deleteService.id);
+        try {
+            const { error } = await supabase.from("services").delete().eq("id", deleteService.id);
+            if (error) throw new Error(error.message);
 
-        setServices((prev) => prev.filter((s) => s.id !== deleteService.id));
-        setDeleting(false);
-        setDeleteService(null);
+            setServices((prev) => prev.filter((s) => s.id !== deleteService.id));
+            toast.success("Đã xóa dịch vụ thành công");
+        } catch (err: any) {
+            toast.error("Xóa dịch vụ thất bại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setDeleting(false);
+            setDeleteService(null);
+        }
     }
 
     function handleSaved() {

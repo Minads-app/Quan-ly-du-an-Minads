@@ -17,6 +17,7 @@ import Link from "next/link";
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
 import CostModal from "@/components/modules/projects/CostModal";
 import type { Project, ProjectCost, ProjectStatus, ProjectType } from "@/types/database";
+import { toast } from "sonner";
 
 // Extended interface for Cost row
 interface ProjectCostRow extends ProjectCost {
@@ -107,10 +108,19 @@ export default function ProjectDetail() {
     async function handleDeleteCost() {
         if (!deleteCost) return;
         setDeletingCost(true);
-        await supabase.from("project_costs").delete().eq("id", deleteCost.id);
-        setCosts((prev) => prev.filter((c) => c.id !== deleteCost.id));
-        setDeletingCost(false);
-        setDeleteCost(null);
+
+        try {
+            const { error } = await supabase.from("project_costs").delete().eq("id", deleteCost.id);
+            if (error) throw new Error(error.message);
+
+            setCosts((prev) => prev.filter((c) => c.id !== deleteCost.id));
+            toast.success("Đã xóa chi phí thành công");
+        } catch (err: any) {
+            toast.error("Xóa chi phí thất bại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setDeletingCost(false);
+            setDeleteCost(null);
+        }
     }
 
     function handleEditCost(cost: ProjectCostRow) {

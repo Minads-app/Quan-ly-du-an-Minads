@@ -17,6 +17,7 @@ import {
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
 import TransactionModal from "@/components/modules/contracts/TransactionModal";
 import type { Transaction, TransactionType } from "@/types/database";
+import { toast } from "sonner";
 
 interface TransactionRow extends Transaction {
     partner: { name: string } | null;
@@ -86,25 +87,34 @@ export default function TransactionsPage() {
         if (!deleteItem) return;
         setDeleting(true);
 
-        // Revert debt paid_amount if linked
-        if (deleteItem.debt_id) {
-            const { data: debt } = await supabase
-                .from("debts")
-                .select("paid_amount")
-                .eq("id", deleteItem.debt_id)
-                .single();
-            if (debt) {
-                await supabase
+        try {
+            // Revert debt paid_amount if linked
+            if (deleteItem.debt_id) {
+                const { data: debt } = await supabase
                     .from("debts")
-                    .update({ paid_amount: Math.max(0, debt.paid_amount - deleteItem.amount) })
-                    .eq("id", deleteItem.debt_id);
+                    .select("paid_amount")
+                    .eq("id", deleteItem.debt_id)
+                    .single();
+                if (debt) {
+                    const { error: debtErr } = await supabase
+                        .from("debts")
+                        .update({ paid_amount: Math.max(0, debt.paid_amount - deleteItem.amount) })
+                        .eq("id", deleteItem.debt_id);
+                    if (debtErr) throw new Error(debtErr.message);
+                }
             }
-        }
 
-        await supabase.from("transactions").delete().eq("id", deleteItem.id);
-        setTransactions((prev) => prev.filter((t) => t.id !== deleteItem.id));
-        setDeleting(false);
-        setDeleteItem(null);
+            const { error } = await supabase.from("transactions").delete().eq("id", deleteItem.id);
+            if (error) throw new Error(error.message);
+
+            setTransactions((prev) => prev.filter((t) => t.id !== deleteItem.id));
+            toast.success(`Đã xóa ${activeTab === "RECEIPT" ? "phiếu thu" : "phiếu chi"} thành công`);
+        } catch (err: any) {
+            toast.error(`Xóa ${activeTab === "RECEIPT" ? "phiếu thu" : "phiếu chi"} thất bại: ` + (err.message || "Lỗi không xác định"));
+        } finally {
+            setDeleting(false);
+            setDeleteItem(null);
+        }
     }
 
     function formatCurrency(amount: number) {

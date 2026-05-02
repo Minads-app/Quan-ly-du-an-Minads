@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import PartnerModal from "@/components/modules/partners/PartnerModal";
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
+import { toast } from "sonner";
 
 type FilterType = "all" | "Client" | "Supplier";
 
@@ -74,17 +75,22 @@ export default function PartnersPage() {
         if (!deletePartner) return;
         setDeleting(true);
 
-        const { error } = await supabase
-            .from("partners")
-            .delete()
-            .eq("id", deletePartner.id);
+        try {
+            const { error } = await supabase
+                .from("partners")
+                .delete()
+                .eq("id", deletePartner.id);
 
-        if (!error) {
+            if (error) throw new Error(error.message);
+
             setPartners((prev) => prev.filter((p) => p.id !== deletePartner.id));
+            toast.success("Đã xóa đối tác thành công");
+        } catch (err: any) {
+            toast.error("Xóa đối tác thất bại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setDeleting(false);
+            setDeletePartner(null);
         }
-
-        setDeleting(false);
-        setDeletePartner(null);
     }
 
     function handleSaved() {

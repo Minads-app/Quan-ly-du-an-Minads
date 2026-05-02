@@ -16,6 +16,7 @@ import {
 import ContractModal from "@/components/modules/contracts/ContractModal";
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
 import type { Contract } from "@/types/database";
+import { toast } from "sonner";
 
 // Extended interface includes client name
 interface ContractRow extends Contract {
@@ -101,10 +102,19 @@ function ContractsContent() {
     async function handleDelete() {
         if (!deleteContract) return;
         setDeleting(true);
-        await supabase.from("contracts").delete().eq("id", deleteContract.id);
-        setContracts((prev) => prev.filter((c) => c.id !== deleteContract.id));
-        setDeleting(false);
-        setDeleteContract(null);
+
+        try {
+            const { error } = await supabase.from("contracts").delete().eq("id", deleteContract.id);
+            if (error) throw new Error(error.message);
+
+            setContracts((prev) => prev.filter((c) => c.id !== deleteContract.id));
+            toast.success("Đã xóa hợp đồng thành công");
+        } catch (err: any) {
+            toast.error("Xóa hợp đồng thất bại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setDeleting(false);
+            setDeleteContract(null);
+        }
     }
 
     function handleEdit(contract: ContractRow) {

@@ -20,6 +20,7 @@ import DeleteConfirm from "@/components/ui/DeleteConfirm";
 import ContractCostModal from "@/components/modules/contracts/ContractCostModal";
 import TransactionModal from "@/components/modules/contracts/TransactionModal";
 import type { Contract, ContractCost, Transaction } from "@/types/database";
+import { toast } from "sonner";
 
 interface CostDebtInfo {
     id: string;
@@ -287,34 +288,54 @@ export default function ContractDetail() {
     async function handleDeleteCost() {
         if (!deleteCost) return;
         setDeletingCost(true);
-        // DB cascade will also delete linked debt
-        await supabase.from("contract_costs").delete().eq("id", deleteCost.id);
-        setCosts((prev) => prev.filter((c) => c.id !== deleteCost.id));
-        setDeletingCost(false);
-        setDeleteCost(null);
+
+        try {
+            // DB cascade will also delete linked debt
+            const { error } = await supabase.from("contract_costs").delete().eq("id", deleteCost.id);
+            if (error) throw new Error(error.message);
+
+            setCosts((prev) => prev.filter((c) => c.id !== deleteCost.id));
+            toast.success("Đã xóa chi phí thành công");
+        } catch (err: any) {
+            toast.error("Xóa chi phí thất bại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setDeletingCost(false);
+            setDeleteCost(null);
+        }
     }
 
     async function handleDeletePayment() {
         if (!deletePayment) return;
         setDeletingPayment(true);
-        // Revert debt paid_amount
-        if (deletePayment.debt_id) {
-            const { data: debt } = await supabase
-                .from("debts")
-                .select("paid_amount")
-                .eq("id", deletePayment.debt_id)
-                .single();
-            if (debt) {
-                await supabase
+
+        try {
+            // Revert debt paid_amount
+            if (deletePayment.debt_id) {
+                const { data: debt } = await supabase
                     .from("debts")
-                    .update({ paid_amount: Math.max(0, debt.paid_amount - deletePayment.amount) })
-                    .eq("id", deletePayment.debt_id);
+                    .select("paid_amount")
+                    .eq("id", deletePayment.debt_id)
+                    .single();
+                if (debt) {
+                    const { error: debtErr } = await supabase
+                        .from("debts")
+                        .update({ paid_amount: Math.max(0, debt.paid_amount - deletePayment.amount) })
+                        .eq("id", deletePayment.debt_id);
+                    if (debtErr) throw new Error(debtErr.message);
+                }
             }
+
+            const { error } = await supabase.from("transactions").delete().eq("id", deletePayment.id);
+            if (error) throw new Error(error.message);
+
+            setPayments((prev) => prev.filter((p) => p.id !== deletePayment.id));
+            toast.success("Đã xóa phiếu thu thành công");
+        } catch (err: any) {
+            toast.error("Xóa phiếu thu thất bại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setDeletingPayment(false);
+            setDeletePayment(null);
         }
-        await supabase.from("transactions").delete().eq("id", deletePayment.id);
-        setPayments((prev) => prev.filter((p) => p.id !== deletePayment.id));
-        setDeletingPayment(false);
-        setDeletePayment(null);
     }
 
     function handleEditCost(cost: ContractCostRow) {

@@ -16,6 +16,7 @@ import {
 import ProjectModal from "@/components/modules/projects/ProjectModal";
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
 import type { Project, ProjectStatus, ProjectType } from "@/types/database";
+import { toast } from "sonner";
 
 // Extended interface includes contract info
 interface ProjectRow extends Project {
@@ -84,10 +85,19 @@ export default function ProjectsPage() {
     async function handleDelete() {
         if (!deleteProject) return;
         setDeleting(true);
-        await supabase.from("projects").delete().eq("id", deleteProject.id);
-        setProjects((prev) => prev.filter((p) => p.id !== deleteProject.id));
-        setDeleting(false);
-        setDeleteProject(null);
+
+        try {
+            const { error } = await supabase.from("projects").delete().eq("id", deleteProject.id);
+            if (error) throw new Error(error.message);
+
+            setProjects((prev) => prev.filter((p) => p.id !== deleteProject.id));
+            toast.success("Đã xóa dự án thành công");
+        } catch (err: any) {
+            toast.error("Xóa dự án thất bại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setDeleting(false);
+            setDeleteProject(null);
+        }
     }
 
     function handleEdit(project: ProjectRow) {

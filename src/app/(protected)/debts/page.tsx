@@ -15,6 +15,7 @@ import {
 import DeleteConfirm from "@/components/ui/DeleteConfirm";
 import DebtModal from "@/components/modules/debts/DebtModal";
 import type { Debt, DebtType } from "@/types/database";
+import { toast } from "sonner";
 
 interface DebtRow extends Debt {
     partner: { name: string; phone: string | null } | null;
@@ -79,12 +80,19 @@ export default function DebtsPage() {
     async function handleDelete() {
         if (!deleteDebt) return;
         setDeleting(true);
-        const { error } = await supabase.from("debts").delete().eq("id", deleteDebt.id);
-        if (!error) {
+
+        try {
+            const { error } = await supabase.from("debts").delete().eq("id", deleteDebt.id);
+            if (error) throw new Error(error.message);
+
             setDebts((prev) => prev.filter((d) => d.id !== deleteDebt.id));
+            toast.success("Đã xóa công nợ thành công");
+        } catch (err: any) {
+            toast.error("Xóa công nợ thất bại: " + (err.message || "Lỗi không xác định"));
+        } finally {
+            setDeleting(false);
             setDeleteDebt(null);
         }
-        setDeleting(false);
     }
 
     function handleEdit(debt: DebtRow) {
