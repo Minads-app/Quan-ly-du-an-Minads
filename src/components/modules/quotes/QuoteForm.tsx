@@ -12,9 +12,11 @@ import {
     Send,
     Loader2,
     PlusCircle,
+    UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import ServiceModal from "@/components/modules/services/ServiceModal";
+import PartnerModal from "@/components/modules/partners/PartnerModal";
 
 interface QuoteItemRow {
     id?: string;
@@ -53,6 +55,7 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
     const [items, setItems] = useState<QuoteItemRow[]>([]);
     const [serviceModalOpen, setServiceModalOpen] = useState(false);
     const [serviceModalForIndex, setServiceModalForIndex] = useState<number | null>(null);
+    const [clientModalOpen, setClientModalOpen] = useState(false);
 
     const isEditing = !!quoteId;
 
@@ -130,6 +133,31 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
 
         loadData();
     }, [quoteId]);
+
+    // Refresh clients list (sau khi tạo khách hàng mới inline)
+    async function refreshClients() {
+        const { data } = await supabase
+            .from("partners")
+            .select("*")
+            .eq("type", "Client")
+            .order("name");
+        if (data) setClients(data as Partner[]);
+        return data as Partner[] | null;
+    }
+
+    async function handleClientCreated() {
+        setClientModalOpen(false);
+        const updatedClients = await refreshClients();
+        // Auto-select khách hàng mới nhất
+        if (updatedClients && updatedClients.length > 0) {
+            const newest = [...updatedClients].sort(
+                (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )[0];
+            if (newest) {
+                setClientId(newest.id);
+            }
+        }
+    }
 
     // Refresh services list (sau khi tạo dịch vụ mới inline)
     async function refreshServices() {
@@ -404,19 +432,31 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                         <label className="label">
                             Khách hàng <span className="text-red-500">*</span>
                         </label>
-                        <select
-                            value={clientId}
-                            onChange={(e) => setClientId(e.target.value)}
-                            className="select"
-                            disabled={!!contractId || isEditing}
-                        >
-                            <option value="">Chọn khách hàng</option>
-                            {clients.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={clientId}
+                                onChange={(e) => setClientId(e.target.value)}
+                                className="select flex-1"
+                                disabled={!!contractId || isEditing}
+                            >
+                                <option value="">Chọn khách hàng</option>
+                                {clients.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                            {!contractId && !isEditing && (
+                                <button
+                                    type="button"
+                                    onClick={() => setClientModalOpen(true)}
+                                    className="flex-shrink-0 p-2.5 rounded-lg border border-dashed border-primary-400 text-primary-600 hover:bg-primary-50 transition-colors"
+                                    title="Thêm mới khách hàng"
+                                >
+                                    <UserPlus className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                     <div>
                         <label className="label">Trạng thái</label>
@@ -674,6 +714,16 @@ export default function QuoteForm({ quoteId }: QuoteFormProps) {
                     </div>
                 )}
             </div>
+
+            {/* Client Modal inline */}
+            {clientModalOpen && (
+                <PartnerModal
+                    partner={null}
+                    onClose={() => setClientModalOpen(false)}
+                    onSaved={handleClientCreated}
+                    defaultType="Client"
+                />
+            )}
 
             {/* Service Modal inline */}
             {serviceModalOpen && (

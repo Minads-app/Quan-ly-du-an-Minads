@@ -11,6 +11,9 @@ import {
     Calendar,
     Filter,
     ChevronDown,
+    AlertCircle,
+    ArrowUpRight,
+    ArrowDownRight,
 } from "lucide-react";
 
 // ---- Types ----
@@ -34,6 +37,15 @@ interface TransactionRow {
     type: string;
     amount: number;
     transaction_date: string;
+    contract_id: string | null;
+}
+
+interface DebtRow {
+    id: string;
+    type: string;
+    total_amount: number;
+    paid_amount: number;
+    partner: { name: string } | null;
 }
 
 type PeriodFilter = "month" | "quarter" | "year" | "all";
@@ -91,6 +103,7 @@ export default function ReportsPage() {
     const [contracts, setContracts] = useState<ContractRow[]>([]);
     const [costs, setCosts] = useState<CostRow[]>([]);
     const [transactions, setTransactions] = useState<TransactionRow[]>([]);
+    const [debts, setDebts] = useState<DebtRow[]>([]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -99,12 +112,13 @@ export default function ReportsPage() {
             const fromISO = from.toISOString();
             const toISO = to.toISOString();
 
-            // 1. Contracts in period (by signed_date or created_at)
+            // 1. Contracts in period
+            const fromDate = fromISO.split("T")[0];
+            const toDate = toISO.split("T")[0];
             const { data: contractData } = await supabase
                 .from("contracts")
                 .select("id, name, total_value, vat_rate, signed_date, created_at, client:partners!client_id(name)")
-                .or(`signed_date.gte.${fromISO.split("T")[0]},and(signed_date.is.null,created_at.gte.${fromISO})`)
-                .or(`signed_date.lte.${toISO.split("T")[0]},and(signed_date.is.null,created_at.lte.${toISO})`)
+                .or(`and(signed_date.gte.${fromDate},signed_date.lte.${toDate}),and(signed_date.is.null,created_at.gte.${fromISO},created_at.lte.${toISO})`)
                 .order("signed_date", { ascending: false });
 
             const fixedContracts: ContractRow[] = (contractData || []).map((c: any) => ({
@@ -133,10 +147,23 @@ export default function ReportsPage() {
             // 3. Transactions in period
             const { data: txData } = await supabase
                 .from("transactions")
-                .select("type, amount, transaction_date")
-                .gte("transaction_date", fromISO.split("T")[0])
-                .lte("transaction_date", toISO.split("T")[0]);
+                .select("type, amount, transaction_date, contract_id")
+                .gte("transaction_date", fromDate)
+                .lte("transaction_date", toDate);
             setTransactions(txData || []);
+
+            // 4. Debts (all, not filtered by period)
+            const { data: debtData } = await supabase
+                .from("debts")
+                .select("id, type, total_amount, paid_amount, partner:partners!partner_id(name)")
+                .order("created_at", { ascending: false });
+            if (debtData) {
+                const fixed = debtData.map((d: any) => ({
+                    ...d,
+                    partner: Array.isArray(d.partner) ? d.partner[0] : d.partner,
+                }));
+                setDebts(fixed as DebtRow[]);
+            }
 
         } catch (err) {
             console.error("Error fetching report data:", err);
@@ -149,39 +176,40 @@ export default function ReportsPage() {
         fetchData();
     }, [fetchData]);
 
-    // ---- Calculations ----
-    // Gross Revenue (total_value of all contracts, includes VAT)
+    // ---- Calculations: KẾ HOẠCH (từ HĐ) ----
     const grossRevenue = contracts.reduce((sum, c) => sum + (c.total_value || 0), 0);
-
-    // Net Revenue (exclude VAT from each contract)
     const netRevenue = contracts.reduce((sum, c) => {
         const rate = c.vat_rate || 0;
-        if (rate > 0) {
-            return sum + c.total_value / (1 + rate / 100);
-        }
-        return sum + (c.total_value || 0);
+        return rate > 0 ? sum + c.total_value / (1 + rate / 100) : sum + (c.total_value || 0);
     }, 0);
-
-    // Total VAT
     const totalVAT = grossRevenue - netRevenue;
+    const projectCosts = costs.reduce((sum, c) => sum + (c.amount || 0), 0);
 
-    // Total Costs
-    const totalCosts = costs.reduce((sum, c) => sum + (c.amount || 0), 0);
-
-    // Estimated Profit (net revenue - costs)
-    const estimatedProfit = netRevenue - totalCosts;
-
-    // Actual cash flow from transactions
-    const totalReceipts = transactions
-        .filter(t => t.type === "RECEIPT")
+    // Chi khác = PAYMENT transactions không gắn HĐ
+    const otherPayments = transactions
+        .filter(t => t.type === "PAYMENT" && !t.contract_id)
         .reduce((sum, t) => sum + (t.amount || 0), 0);
-    const totalPayments = transactions
-        .filter(t => t.type === "PAYMENT")
-        .reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalCostsAll = projectCosts + otherPayments;
+    const plannedProfit = netRevenue - totalCostsAll;
+
+    // ---- Calculations: THỰC TẾ (từ dòng tiền) ----
+    const totalReceipts = transactions.filter(t => t.type === "RECEIPT").reduce((sum, t) => sum + (t.amount || 0), 0);
+    const receiptsContract = transactions.filter(t => t.type === "RECEIPT" && t.contract_id).reduce((sum, t) => sum + (t.amount || 0), 0);
+    const receiptsOther = transactions.filter(t => t.type === "RECEIPT" && !t.contract_id).reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalPayments = transactions.filter(t => t.type === "PAYMENT").reduce((sum, t) => sum + (t.amount || 0), 0);
+    const paymentsContract = transactions.filter(t => t.type === "PAYMENT" && t.contract_id).reduce((sum, t) => sum + (t.amount || 0), 0);
+    const paymentsOther = otherPayments;
+    const actualProfit = totalReceipts - totalPayments;
+
+    // ---- Calculations: CÔNG NỢ ----
+    const receivableDebts = debts.filter(d => d.type === "RECEIVABLE");
+    const payableDebts = debts.filter(d => d.type === "PAYABLE");
+    const totalReceivable = receivableDebts.reduce((s, d) => s + (d.total_amount - d.paid_amount), 0);
+    const totalPayable = payableDebts.reduce((s, d) => s + (d.total_amount - d.paid_amount), 0);
+    const netDebt = totalReceivable - totalPayable;
 
     // VAT contracts
     const vatContracts = contracts.filter(c => (c.vat_rate || 0) > 0);
-    const nonVatContracts = contracts.filter(c => !c.vat_rate || c.vat_rate === 0);
 
     // ---- Period Navigation ----
     function navigate(direction: number) {
@@ -256,79 +284,80 @@ export default function ReportsPage() {
                 <>
                     {/* ======== SUMMARY CARDS ======== */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                        {/* Doanh thu thuần */}
                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
                             <div className="flex items-start justify-between mb-3">
-                                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-                                    <TrendingUp className="w-5 h-5" />
-                                </div>
+                                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl"><TrendingUp className="w-5 h-5" /></div>
                                 <span className="text-[11px] font-semibold text-slate-400 uppercase">Chưa gồm VAT</span>
                             </div>
                             <p className="text-sm font-medium text-slate-500 mb-1">Doanh thu thuần</p>
-                            <h3 className="text-xl font-bold text-emerald-600 truncate" title={formatCurrency(netRevenue)}>
-                                {formatCurrency(netRevenue)}
-                            </h3>
+                            <h3 className="text-xl font-bold text-emerald-600 truncate" title={formatCurrency(netRevenue)}>{formatCurrency(netRevenue)}</h3>
                         </div>
-
-                        {/* Tổng VAT phải nộp */}
                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
                             <div className="flex items-start justify-between mb-3">
-                                <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl">
-                                    <Receipt className="w-5 h-5" />
-                                </div>
-                                <span className="text-[11px] font-semibold text-orange-500 uppercase">Thuế phải nộp</span>
-                            </div>
-                            <p className="text-sm font-medium text-slate-500 mb-1">Tổng VAT</p>
-                            <h3 className="text-xl font-bold text-orange-600 truncate" title={formatCurrency(totalVAT)}>
-                                {formatCurrency(totalVAT)}
-                            </h3>
-                        </div>
-
-                        {/* Tổng chi phí */}
-                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                            <div className="flex items-start justify-between mb-3">
-                                <div className="p-2.5 bg-red-50 text-red-600 rounded-xl">
-                                    <TrendingDown className="w-5 h-5" />
-                                </div>
+                                <div className="p-2.5 bg-red-50 text-red-600 rounded-xl"><TrendingDown className="w-5 h-5" /></div>
+                                <span className="text-[11px] font-semibold text-slate-400 uppercase">Dự án + Khác</span>
                             </div>
                             <p className="text-sm font-medium text-slate-500 mb-1">Tổng chi phí</p>
-                            <h3 className="text-xl font-bold text-red-600 truncate" title={formatCurrency(totalCosts)}>
-                                {formatCurrency(totalCosts)}
-                            </h3>
+                            <h3 className="text-xl font-bold text-red-600 truncate" title={formatCurrency(totalCostsAll)}>{formatCurrency(totalCostsAll)}</h3>
                         </div>
-
-                        {/* Lợi nhuận ước tính */}
                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
                             <div className="flex items-start justify-between mb-3">
-                                <div className={`p-2.5 rounded-xl ${estimatedProfit >= 0 ? "bg-blue-50 text-blue-600" : "bg-red-50 text-red-600"}`}>
-                                    <Wallet className="w-5 h-5" />
-                                </div>
-                                {estimatedProfit >= 0 ? (
-                                    <span className="text-[11px] font-semibold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full">Lãi</span>
-                                ) : (
-                                    <span className="text-[11px] font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Lỗ</span>
-                                )}
+                                <div className={`p-2.5 rounded-xl ${plannedProfit >= 0 ? "bg-blue-50 text-blue-600" : "bg-red-50 text-red-600"}`}><Wallet className="w-5 h-5" /></div>
+                                {plannedProfit >= 0 ? <span className="text-[11px] font-semibold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full">Lãi</span> : <span className="text-[11px] font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Lỗ</span>}
                             </div>
-                            <p className="text-sm font-medium text-slate-500 mb-1">Lợi nhuận ước tính</p>
-                            <h3 className={`text-xl font-bold truncate ${estimatedProfit >= 0 ? "text-blue-600" : "text-red-600"}`} title={formatCurrency(estimatedProfit)}>
-                                {formatCurrency(estimatedProfit)}
-                            </h3>
+                            <p className="text-sm font-medium text-slate-500 mb-1">LN Kế hoạch</p>
+                            <h3 className={`text-xl font-bold truncate ${plannedProfit >= 0 ? "text-blue-600" : "text-red-600"}`}>{formatCurrency(plannedProfit)}</h3>
+                        </div>
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
+                            <div className="flex items-start justify-between mb-3">
+                                <div className={`p-2.5 rounded-xl ${actualProfit >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}><Receipt className="w-5 h-5" /></div>
+                                {actualProfit >= 0 ? <span className="text-[11px] font-semibold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full">Dương</span> : <span className="text-[11px] font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Âm</span>}
+                            </div>
+                            <p className="text-sm font-medium text-slate-500 mb-1">LN Thực tế</p>
+                            <h3 className={`text-xl font-bold truncate ${actualProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{formatCurrency(actualProfit)}</h3>
                         </div>
                     </div>
 
-                    {/* ======== CASH FLOW SUMMARY ======== */}
+                    {/* ======== CASH FLOW + DEBT CARDS ======== */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-5 rounded-2xl text-white">
-                            <p className="text-sm text-slate-300 mb-1">Tổng giá trị HĐ (gồm VAT)</p>
-                            <h3 className="text-2xl font-bold">{formatCurrency(grossRevenue)}</h3>
-                        </div>
                         <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-5 rounded-2xl text-white">
-                            <p className="text-sm text-emerald-200 mb-1">Đã thu (Phiếu thu)</p>
+                            <div className="flex items-center gap-2 mb-1"><ArrowDownRight className="w-4 h-4 text-emerald-200" /><p className="text-sm text-emerald-200">Tổng đã thu</p></div>
                             <h3 className="text-2xl font-bold">{formatCurrency(totalReceipts)}</h3>
+                            <div className="flex gap-3 mt-2 text-xs text-emerald-200">
+                                <span>HĐ: {formatCurrency(receiptsContract)}</span>
+                                <span>Khác: {formatCurrency(receiptsOther)}</span>
+                            </div>
                         </div>
                         <div className="bg-gradient-to-br from-red-500 to-red-600 p-5 rounded-2xl text-white">
-                            <p className="text-sm text-red-200 mb-1">Đã chi (Phiếu chi)</p>
+                            <div className="flex items-center gap-2 mb-1"><ArrowUpRight className="w-4 h-4 text-red-200" /><p className="text-sm text-red-200">Tổng đã chi</p></div>
                             <h3 className="text-2xl font-bold">{formatCurrency(totalPayments)}</h3>
+                            <div className="flex gap-3 mt-2 text-xs text-red-200">
+                                <span>HĐ: {formatCurrency(paymentsContract)}</span>
+                                <span>Khác: {formatCurrency(paymentsOther)}</span>
+                            </div>
+                        </div>
+                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-5 rounded-2xl text-white">
+                            <div className="flex items-center gap-2 mb-1"><Wallet className="w-4 h-4 text-slate-300" /><p className="text-sm text-slate-300">Dòng tiền ròng</p></div>
+                            <h3 className={`text-2xl font-bold ${actualProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}>{formatCurrency(actualProfit)}</h3>
+                        </div>
+                    </div>
+
+                    {/* ======== DEBT SUMMARY ======== */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                            <div className="flex items-center gap-2 mb-2"><div className="p-2 rounded-lg bg-blue-50 text-blue-600"><ArrowDownRight className="w-4 h-4" /></div><span className="text-sm font-medium text-slate-500">Phải thu còn lại</span></div>
+                            <h3 className="text-xl font-bold text-blue-600">{formatCurrency(totalReceivable)}</h3>
+                            <p className="text-xs text-slate-400 mt-1">{receivableDebts.length} khoản</p>
+                        </div>
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                            <div className="flex items-center gap-2 mb-2"><div className="p-2 rounded-lg bg-orange-50 text-orange-600"><ArrowUpRight className="w-4 h-4" /></div><span className="text-sm font-medium text-slate-500">Phải trả còn lại</span></div>
+                            <h3 className="text-xl font-bold text-orange-600">{formatCurrency(totalPayable)}</h3>
+                            <p className="text-xs text-slate-400 mt-1">{payableDebts.length} khoản</p>
+                        </div>
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                            <div className="flex items-center gap-2 mb-2"><div className={`p-2 rounded-lg ${netDebt >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}><AlertCircle className="w-4 h-4" /></div><span className="text-sm font-medium text-slate-500">Công nợ ròng</span></div>
+                            <h3 className={`text-xl font-bold ${netDebt >= 0 ? "text-emerald-600" : "text-red-600"}`}>{formatCurrency(netDebt)}</h3>
+                            <p className="text-xs text-slate-400 mt-1">{netDebt >= 0 ? "Thu > Trả" : "Trả > Thu"}</p>
                         </div>
                     </div>
 
@@ -410,97 +439,41 @@ export default function ReportsPage() {
                         )}
                     </div>
 
-                    {/* ======== NON-VAT CONTRACTS TABLE ======== */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                        <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-                            <h3 className="font-bold text-slate-900 text-lg">Hợp đồng không có VAT</h3>
-                            <p className="text-xs text-slate-500 mt-0.5">{nonVatContracts.length} hợp đồng</p>
+                    {/* ======== PROFIT BREAKDOWN: Plan vs Actual ======== */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="p-5 border-b border-slate-100 bg-blue-50/50">
+                                <h3 className="font-bold text-slate-900 text-lg">📋 Lợi nhuận Kế hoạch</h3>
+                                <p className="text-xs text-slate-500 mt-0.5">Tính từ giá trị Hợp đồng &amp; chi phí dự án</p>
+                            </div>
+                            <div className="p-5 space-y-2">
+                                <div className="flex justify-between py-2"><span className="text-sm text-slate-600">Tổng giá trị HĐ (gồm VAT)</span><span className="font-semibold text-slate-800">{formatCurrency(grossRevenue)}</span></div>
+                                <div className="flex justify-between py-2 text-orange-600"><span className="text-sm">− VAT phải nộp</span><span className="font-semibold">− {formatCurrency(totalVAT)}</span></div>
+                                <div className="border-t border-dashed border-slate-200 my-1" />
+                                <div className="flex justify-between py-2"><span className="text-sm font-medium text-slate-700">= Doanh thu thuần</span><span className="font-bold text-emerald-600">{formatCurrency(netRevenue)}</span></div>
+                                <div className="flex justify-between py-2 text-red-600"><span className="text-sm">− Chi phí dự án</span><span className="font-semibold">− {formatCurrency(projectCosts)}</span></div>
+                                {otherPayments > 0 && <div className="flex justify-between py-2 text-red-500"><span className="text-sm">− Chi khác (ngoài HĐ)</span><span className="font-semibold">− {formatCurrency(otherPayments)}</span></div>}
+                                <div className="border-t border-slate-200 my-1" />
+                                <div className="flex justify-between py-3"><span className="text-base font-bold text-slate-900">= LỢI NHUẬN KẾ HOẠCH</span><span className={`text-xl font-bold ${plannedProfit >= 0 ? "text-blue-600" : "text-red-600"}`}>{formatCurrency(plannedProfit)}</span></div>
+                                {netRevenue > 0 && <div className="flex justify-between py-1"><span className="text-sm text-slate-500">Biên LN</span><span className={`font-semibold ${plannedProfit >= 0 ? "text-blue-600" : "text-red-600"}`}>{((plannedProfit / netRevenue) * 100).toFixed(1)}%</span></div>}
+                            </div>
                         </div>
-
-                        {nonVatContracts.length === 0 ? (
-                            <div className="p-8 text-center text-slate-400">
-                                <FileText className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-                                <p>Không có hợp đồng nào không gồm VAT trong kỳ</p>
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div className="p-5 border-b border-slate-100 bg-emerald-50/50">
+                                <h3 className="font-bold text-slate-900 text-lg">💰 Lợi nhuận Thực tế</h3>
+                                <p className="text-xs text-slate-500 mt-0.5">Tính từ dòng tiền thu/chi thực tế</p>
                             </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="bg-slate-50 text-left text-xs uppercase text-slate-500 font-semibold">
-                                            <th className="px-5 py-3">#</th>
-                                            <th className="px-5 py-3">Hợp đồng</th>
-                                            <th className="px-5 py-3">Khách hàng</th>
-                                            <th className="px-5 py-3 text-right">Giá trị HĐ (= Doanh thu)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {nonVatContracts.map((c, idx) => (
-                                            <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-5 py-3 text-sm text-slate-400">{idx + 1}</td>
-                                                <td className="px-5 py-3">
-                                                    <p className="text-sm font-semibold text-slate-800 truncate max-w-[300px]">{c.name}</p>
-                                                    <p className="text-xs text-slate-400 mt-0.5">
-                                                        {c.signed_date
-                                                            ? new Date(c.signed_date).toLocaleDateString("vi-VN")
-                                                            : new Date(c.created_at).toLocaleDateString("vi-VN")}
-                                                    </p>
-                                                </td>
-                                                <td className="px-5 py-3 text-sm text-slate-600">{c.client?.name || "—"}</td>
-                                                <td className="px-5 py-3 text-sm text-right font-semibold text-slate-800">{formatCurrency(c.total_value)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr className="bg-slate-50 font-bold text-sm">
-                                            <td colSpan={3} className="px-5 py-3 text-slate-600">Tổng cộng</td>
-                                            <td className="px-5 py-3 text-right text-slate-800">
-                                                {formatCurrency(nonVatContracts.reduce((s, c) => s + c.total_value, 0))}
-                                            </td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                            <div className="p-5 space-y-2">
+                                <div className="flex justify-between py-2"><span className="text-sm text-slate-600">Thu theo HĐ</span><span className="font-semibold text-emerald-700">{formatCurrency(receiptsContract)}</span></div>
+                                {receiptsOther > 0 && <div className="flex justify-between py-2"><span className="text-sm text-slate-600">+ Thu khác</span><span className="font-semibold text-emerald-600">+ {formatCurrency(receiptsOther)}</span></div>}
+                                <div className="border-t border-dashed border-slate-200 my-1" />
+                                <div className="flex justify-between py-2"><span className="text-sm font-medium text-slate-700">= Tổng thu</span><span className="font-bold text-emerald-600">{formatCurrency(totalReceipts)}</span></div>
+                                <div className="flex justify-between py-2 text-red-600"><span className="text-sm">− Chi theo HĐ</span><span className="font-semibold">− {formatCurrency(paymentsContract)}</span></div>
+                                {paymentsOther > 0 && <div className="flex justify-between py-2 text-red-500"><span className="text-sm">− Chi khác</span><span className="font-semibold">− {formatCurrency(paymentsOther)}</span></div>}
+                                <div className="border-t border-slate-200 my-1" />
+                                <div className="flex justify-between py-3"><span className="text-base font-bold text-slate-900">= LỢI NHUẬN THỰC TẾ</span><span className={`text-xl font-bold ${actualProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{formatCurrency(actualProfit)}</span></div>
+                                {totalReceipts > 0 && <div className="flex justify-between py-1"><span className="text-sm text-slate-500">Biên LN</span><span className={`font-semibold ${actualProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{((actualProfit / totalReceipts) * 100).toFixed(1)}%</span></div>}
                             </div>
-                        )}
-                    </div>
-
-                    {/* ======== PROFIT BREAKDOWN ======== */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                        <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-                            <h3 className="font-bold text-slate-900 text-lg">Tổng kết Lợi nhuận</h3>
-                        </div>
-                        <div className="p-5 space-y-3">
-                            <div className="flex items-center justify-between py-2">
-                                <span className="text-sm text-slate-600">Tổng giá trị Hợp đồng (gồm VAT)</span>
-                                <span className="font-semibold text-slate-800">{formatCurrency(grossRevenue)}</span>
-                            </div>
-                            <div className="flex items-center justify-between py-2 text-orange-600">
-                                <span className="text-sm">− Thuế VAT phải nộp</span>
-                                <span className="font-semibold">− {formatCurrency(totalVAT)}</span>
-                            </div>
-                            <div className="border-t border-dashed border-slate-200 my-1" />
-                            <div className="flex items-center justify-between py-2">
-                                <span className="text-sm font-medium text-slate-700">= Doanh thu thuần (sau VAT)</span>
-                                <span className="font-bold text-emerald-600">{formatCurrency(netRevenue)}</span>
-                            </div>
-                            <div className="flex items-center justify-between py-2 text-red-600">
-                                <span className="text-sm">− Tổng chi phí (Vật tư, Nhân công, ...)</span>
-                                <span className="font-semibold">− {formatCurrency(totalCosts)}</span>
-                            </div>
-                            <div className="border-t border-slate-200 my-1" />
-                            <div className="flex items-center justify-between py-3">
-                                <span className="text-base font-bold text-slate-900">= LỢI NHUẬN ƯỚC TÍNH</span>
-                                <span className={`text-xl font-bold ${estimatedProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                                    {formatCurrency(estimatedProfit)}
-                                </span>
-                            </div>
-                            {netRevenue > 0 && (
-                                <div className="flex items-center justify-between py-2">
-                                    <span className="text-sm text-slate-500">Biên lợi nhuận</span>
-                                    <span className={`font-semibold ${estimatedProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                                        {((estimatedProfit / netRevenue) * 100).toFixed(1)}%
-                                    </span>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </>

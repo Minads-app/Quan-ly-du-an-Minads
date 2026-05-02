@@ -12,12 +12,14 @@ interface PartnerModalProps {
     partner: Partner | null;
     onClose: () => void;
     onSaved: () => void;
+    defaultType?: "Client" | "Supplier";
 }
 
 export default function PartnerModal({
     partner,
     onClose,
     onSaved,
+    defaultType,
 }: PartnerModalProps) {
     const supabase = createClient();
     const [loading, setLoading] = useState(false);
@@ -33,7 +35,7 @@ export default function PartnerModal({
         resolver: zodResolver(partnerSchema),
         defaultValues: {
             name: partner?.name || "",
-            type: partner?.type || "Client",
+            type: partner?.type || defaultType || "Client",
             phone: partner?.phone || "",
             address: partner?.address || "",
             tax_code: partner?.tax_code || "",
@@ -125,6 +127,7 @@ export default function PartnerModal({
                     </div>
 
                     {/* Loại đối tác */}
+                    {!defaultType && (
                     <div>
                         <label htmlFor="type" className="label">
                             Loại đối tác <span className="text-red-500">*</span>
@@ -141,6 +144,7 @@ export default function PartnerModal({
                             <p className="error-text">{errors.type.message}</p>
                         )}
                     </div>
+                    )}
 
                     {/* Số điện thoại */}
                     <div>
